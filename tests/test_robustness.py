@@ -34,12 +34,14 @@ with ctx.as_user(a.id):
 # The processor and memory readings are written per platform. On one PeakCut cannot measure, free memory falls
 # back to a fixed 99.0 GB and the processor reads 0 forever, so busy() never fires and the guard that holds new
 # videos back while the machine is full is silently off. These two checks are what notice that.
-try:
-    busy0, tot0 = load._cpu_times()
-    time.sleep(0.3)
-    busy1, tot1 = load._cpu_times()
+try:                      # macOS updates these counts lazily, so wait for them to move rather than assume a gap
+    busy0, tot0 = busy1, tot1 = load._cpu_times()
+    waited = time.time()
+    while tot1 == tot0 and time.time() - waited < 5:
+        time.sleep(0.1)
+        busy1, tot1 = load._cpu_times()
     cpu_ok = tot1 > tot0 and busy1 >= busy0 and 0 <= busy1 <= tot1
-    cpu_why = f"{(busy0, tot0)} -> {(busy1, tot1)}"
+    cpu_why = f"{(busy0, tot0)} -> {(busy1, tot1)} after {time.time() - waited:.1f}s"
 except OSError as e:
     cpu_ok, cpu_why = False, f"the processor cannot be read here: {e!r}"
 check("the monitor reads this computer's processor", cpu_ok, cpu_why)
