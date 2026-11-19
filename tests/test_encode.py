@@ -9,7 +9,8 @@ os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-enc-")
 sys.path.insert(0, ".")
 from pathlib import Path
 
-from studio import config, render
+# tools puts the ffmpeg the app will actually use on the PATH (PEAKCUT_FFMPEG_DIR), so this checks the same one
+from studio import config, render, tools
 
 fails = []
 def check(n, got, want=True):
@@ -20,9 +21,11 @@ def check(n, got, want=True):
 work = Path(tempfile.mkdtemp(prefix="pc-enc-work-"))
 # A moving, noisy picture: it does not compress away, so a change in the quality target shows in the file size.
 src = work / "src.mp4"
-subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "nullsrc=s=640x360:r=25,noise=alls=28:allf=t",
-                "-frames:v", "50", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(src)],
-               check=True)
+subprocess.run(["ffmpeg", "-y", "-v", "error",
+                "-f", "lavfi", "-i", "nullsrc=s=640x360:r=25,noise=alls=28:allf=t",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",   # a clip carries sound too
+                "-t", "2.5", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", str(src)], check=True)
 ass = render.build_ass([{"w": "hello", "s": 0.2, "e": 0.8}], 0, 2, "HOOK", "bounce", [], 300, 1380)
 render._qsv_ok = False                 # no Intel hardware here: check the libx264 path everyone falls back to
 

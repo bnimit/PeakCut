@@ -4,6 +4,9 @@ import io, os, shutil, sys, tarfile, tempfile
 from pathlib import Path
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-tools-"); os.environ["DATABASE_URL"] = ""
 os.environ.pop("PEAKCUT_MODELS", None)          # this test makes and removes a model: only ever inside its own folder
+# This test sets this itself further down. Empty rather than removed: config fills a missing one in from .env,
+# where a real folder would decide the result of the checks below instead of the test deciding it.
+os.environ["PEAKCUT_FFMPEG_DIR"] = ""
 os.environ.update(PEAKCUT_AI_PROVIDER="gemini", PEAKCUT_AI_MODELS="gemini-old", PEAKCUT_AI_KEY="test-key-123456")
 sys.path.insert(0, ".")
 from studio import ai, config, fetch_model, safe, tools
@@ -33,6 +36,11 @@ os.environ["PEAKCUT_FFMPEG_DIR"] = hidden
 tools._places = real_places
 check("PEAKCUT_FFMPEG_DIR is looked in first", tools._places()[0], Path(hidden))
 tools.setup()
+# Being looked in first is not the same as being used: the ffmpeg already on the PATH may be one that cannot do
+# the job (a build without libass cannot burn captions at all), and the whole point of naming a folder is to say
+# "that one, not whatever you find".
+check("...and it is used even when another ffmpeg is already on the PATH",
+      Path(shutil.which("ffmpeg") or "/none").parent, Path(hidden))
 
 # ---- the speech model
 d = config.ASR_MODEL_DIR

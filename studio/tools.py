@@ -49,8 +49,18 @@ def setup() -> list:
     """Make ffmpeg and ffprobe reachable for everything PeakCut runs. Returns the ones that could not be found."""
     exe = ".exe" if sys.platform == "win32" else ""
     missing = []
+    named = os.environ.get("PEAKCUT_FFMPEG_DIR") or ""
     for name in NEEDED:
-        if shutil.which(name):
+        # A folder named in the settings wins over whatever is on the PATH. Being on the PATH is not the same as
+        # being able to do the job: an ffmpeg built without libass has no "ass" filter and cannot burn a caption,
+        # and it is the only reason anyone sets this. Preferring the PATH would make the setting do nothing.
+        want = (Path(named) / (name + exe)) if named else None
+        found = shutil.which(name)
+        if want is not None and want.is_file():
+            if not found or Path(found).resolve() != want.resolve():
+                os.environ["PATH"] = str(want.parent) + os.pathsep + os.environ.get("PATH", "")
+            continue
+        if found:
             continue
         for d in _places():
             try:
