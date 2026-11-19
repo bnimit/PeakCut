@@ -62,11 +62,16 @@ class _Quiet:
     def error(self, m): pass
 
 
+def _live_format(height: int) -> str:
+    """What to ask yt-dlp for: a stream no taller than `height`, or the best on offer if it has nothing smaller."""
+    return f"b[height<={height}]/bv*[height<={height}]+ba/b"
+
+
 def resolve(url: str) -> dict:
     """Ask yt-dlp for the stream's playable address. Raises NotLive if the channel is offline."""
     import yt_dlp
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "logger": _Quiet(),
-            "format": "b[height<=720]/bv*[height<=720]+ba/b"}
+            "format": _live_format(config.LIVE_HEIGHT)}
     if media.is_youtube(url) and media.youtube_paused():
         raise NotLive(media.YT_BLOCKED)
     try:
