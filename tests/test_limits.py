@@ -3,7 +3,7 @@ at once, any number of creators. Runs against the code directly, with its own em
 import os, sys, tempfile
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-lim-")
 for k in ("PEAKCUT_MAX_LIVE_PER_USER", "PEAKCUT_MAX_JOBS_PER_USER", "PEAKCUT_MAX_UPLOAD_MB", "PEAKCUT_MAX_VIDEO_HOURS",
-          "PEAKCUT_MAX_LIVE_HOURS", "PEAKCUT_MAX_USER_GB", "PEAKCUT_MAX_CREATORS"):
+          "PEAKCUT_MAX_LIVE_HOURS", "PEAKCUT_MAX_USER_GB", "PEAKCUT_MAX_CREATORS", "PEAKCUT_LIVE_HEIGHT"):
     os.environ.pop(k, None)
 os.environ.update(DATABASE_URL="", PEAKCUT_MAX_LIVE="20")
 sys.path.insert(0, ".")
@@ -18,6 +18,29 @@ check("five videos at once", config.MAX_ACTIVE_JOBS_PER_USER, 5)
 check("no cap on recordings, video length, recording length, storage, uploads or creators",
       all(x >= 10 ** 6 for x in (config.MAX_LIVE_PER_USER, config.MAX_VIDEO_HOURS, config.MAX_LIVE_HOURS, config.MAX_USER_GB,
                                  config.MAX_UPLOAD_MB, config.MAX_CREATORS)))
+
+# ---- what a recording asks the stream for. The clip frame is always 1080x1920, so a 720p stream is scaled up to
+# fill it: the file says 1080p and the picture does not. Recordings are copied, not re-encoded (-c copy), so the
+# height asked for here is the height that lands on disk.
+check("recordings ask for 1080p by default", getattr(config, "LIVE_HEIGHT", None), 1080)
+
+import yt_dlp                                            # noqa: E402
+asked = {}
+class _FakeYDL:                                          # noqa: E302 - what reaches yt-dlp is the thing being checked
+    def __init__(self, opts): asked.update(opts)
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def extract_info(self, url, download=False):
+        return {"is_live": True, "title": "t", "uploader": "u", "requested_formats": [{"url": "https://x/s.m3u8"}]}
+_real_ydl = yt_dlp.YoutubeDL
+yt_dlp.YoutubeDL = _FakeYDL
+try:
+    live.resolve("https://www.twitch.tv/someone")
+finally:
+    yt_dlp.YoutubeDL = _real_ydl
+check("a recording asks the stream for that height, not a fixed 720",
+      "height<=1080" in asked.get("format", "") and "height<=720" not in asked.get("format", ""), True)
+check("a thinner connection can still ask for less", "height<=480" in live._live_format(480), True)
 
 u, _ = auth._create("owner@example.com", "Owner", password_hash="x")
 started = []
