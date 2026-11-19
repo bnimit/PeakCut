@@ -286,20 +286,40 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
         shutil.rmtree(work, ignore_errors=True)
 
 
+def _subs_and_colour(name: str) -> str:
+    """The last link of the chain: burn the captions in, then say what the colour is.
+
+    The colour has to be said here rather than as an output option, because as an output option ffmpeg writes
+    only one of the three tags and leaves the other two unknown, which is how a clip ends up looking different
+    on YouTube than it did on the way in. bt709 is what the sources are and what YouTube expects."""
+    return (f"[v0]ass={name}.ass:fontsdir=f,"
+            "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709[v]")
+
+
+def _encoders(crf: int, preset: str) -> list:
+    """The encoders to try, best first: Intel's hardware one where there is one, then libx264 everywhere.
+
+    Both are given a quality target rather than a bitrate, so a still scene spends little and a busy one spends
+    what it needs. Each entry begins with its pixel format, which `base` ends by asking for. The hardware one
+    counts a little stricter than x264 at the same number, hence the offset."""
+    out = []
+    if _qsv_ok is not False:
+        out.append(("qsv", ["nv12", "-c:v", "h264_qsv", "-global_quality", str(crf + 2), "-preset", "fast"]))
+    out.append(("x264", ["yuv420p", "-c:v", "libx264", "-crf", str(crf), "-preset", preset]))
+    return out
+
+
 def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str, face=None) -> dict:
     global _qsv_ok
     (work / f"{name}.ass").write_text(ass, encoding="utf-8")
     (work / "f").mkdir()
     for f in config.FONTS_DIR.glob("*.ttf"):
         shutil.copyfile(f, work / "f" / f.name)
-    fc = _filter(layout, fg_h, face) + f"[v0]ass={name}.ass:fontsdir=f[v]"
+    fc = _filter(layout, fg_h, face) + _subs_and_colour(name)
     base = ["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src),
             "-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-pix_fmt"]
-    encoders = []
-    if _qsv_ok is not False:
-        encoders.append(("qsv", ["nv12", "-c:v", "h264_qsv", "-global_quality", "23", "-preset", "fast"]))
-    encoders.append(("x264", ["yuv420p", "-c:v", "libx264", "-crf", "21", "-preset", "veryfast"]))
+    encoders = _encoders(config.CRF, config.X264_PRESET)
     err = None
     for label, enc in encoders:
         p = subprocess.run(base + enc + [f"{name}.mp4"], cwd=work, capture_output=True, text=True,

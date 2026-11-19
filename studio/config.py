@@ -250,3 +250,13 @@ def _read_google_client() -> tuple:
 # ---------------------------------------------------------------- video
 MAX_SOURCE_HEIGHT = 1080
 OUT_W, OUT_H, OUT_FPS = 1080, 1920, 30
+
+# How a finished clip is encoded. A clip is a master: YouTube re-encodes whatever it is given, so these bits are
+# spent on surviving that second pass rather than on a small file, which costs nothing but upload time. CRF is a
+# quality target, where lower is better and about 6 less is twice the size. The preset is how hard x264 works to
+# earn each bit: "medium" is roughly a quarter the speed of "veryfast" for about a fifth less size at the same
+# quality. On a machine that cannot keep up, "fast" or "veryfast" and a CRF of 21 is the older, thriftier setting.
+CRF = min(28, max(14, int(env("PEAKCUT_CRF", "18"))))
+X264_PRESETS = ("ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow")
+_preset = (env("PEAKCUT_X264_PRESET", "medium") or "").strip().lower()
+X264_PRESET = _preset if _preset in X264_PRESETS else "medium"      # a typo must not stop every clip rendering
