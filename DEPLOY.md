@@ -31,8 +31,8 @@ platform's own page, and come back. For that, the server needs one app registere
 do it right there: press **Set up** on a platform, follow the steps shown, and paste the app's id and secret (or put
 them in `.env`, see `.env.example`). The redirect address to register is shown in the panel, with a Copy button.
 
-- **YouTube** (Google Cloud): an OAuth client of type Web application, with YouTube Data API v3 turned on. Until
-  Google verifies the app, people see a warning screen and uploads stay private.
+- **YouTube** (Google Cloud): an OAuth client of type Web application, with YouTube Data API v3 and the YouTube
+  Analytics API turned on. Until Google verifies the app, people see a warning screen and uploads stay private.
 - **Instagram** (Meta for Developers): a Business app with Instagram (API setup with Instagram login). Works with
   Creator and Business accounts. Until Meta reviews the app, only accounts added as testers can connect. Instagram
   fetches each clip from a one-hour signed link on your site, so the site needs a public https address.
@@ -49,8 +49,14 @@ In Google Cloud, create an OAuth client of type **Web application** with these r
 - `https://your-domain/auth/google/callback`
 - `https://your-domain/oauth/youtube/callback`
 
-Enable **YouTube Data API v3** in the same project. Posting publicly to YouTube needs Google's API audit;
-until then uploads from the API stay private.
+Enable **YouTube Data API v3** and the **YouTube Analytics API** in the same project. Posting publicly to YouTube
+needs Google's API audit; until then uploads from the API stay private.
+
+PeakCut asks for four permissions: posting clips, reading the channel, changing the title and description of a clip
+it already posted, and reading that clip's numbers (how much of it people watched, and where the views came from).
+The last two were added later, so **anyone who connected YouTube before this version has to connect it again**:
+remove YouTube in Settings, Connected apps, and press Connect. Without that, editing and the numbers fail with
+"insufficient permission" while posting keeps working.
 
 ## Email
 

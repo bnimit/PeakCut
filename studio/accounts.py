@@ -26,7 +26,11 @@ SECRET_KEYS = ("discord_webhook", "telegram_token")
 SETTING_DEFAULTS = {"discord_webhook": "", "telegram_token": "", "telegram_chat": "", "paused": False,
                     "digest_hour": 8, "last_digest": "", "tour_done": False}
 
-YT_SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"
+# upload: post clips. readonly: read the channel and view counts. force-ssl: change the title and description of a
+# video that is already posted. yt-analytics.readonly: retention, swipe-away rate and where views come from.
+# Anyone who connected before these two were added has to connect YouTube again to give them.
+YT_SCOPES = ("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly "
+             "https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/yt-analytics.readonly")
 IG = "https://graph.instagram.com"
 IG_UPLOAD = "https://rupload.facebook.com/ig-api-upload/v21.0"
 IG_SCOPES = "instagram_business_basic,instagram_business_content_publish"
@@ -364,6 +368,59 @@ def youtube_views(acc, ids: list) -> dict:
         for it in r.get("items", []):
             out[it["id"]] = int(it["statistics"].get("viewCount", 0))
     return out
+
+
+_NEEDS_RECONNECT = "If it says 'insufficient permission', remove YouTube in Connected apps and connect it again."
+
+
+def youtube_update_video(acc, video_id: str, title: str = None, description: str = None, tags: list = None) -> dict:
+    """Change the title, description or tags of a video that is already on YouTube. Anything left as None stays
+    as it is. YouTube wants the whole snippet back, so the current one is read first."""
+    head = {"Authorization": f"Bearer {_yt_token(acc)}"}
+    cur = _check(httpx.get("https://www.googleapis.com/youtube/v3/videos", params={"part": "snippet", "id": video_id},
+                           headers=head, timeout=30), "Reading the video").json().get("items", [])
+    if not cur:
+        raise ValueError("That video is not on the connected channel.")
+    sn = cur[0]["snippet"]
+    snippet = {"title": sn["title"], "description": sn.get("description", ""), "categoryId": sn["categoryId"],
+               "tags": sn.get("tags", [])}
+    if title is not None:
+        snippet["title"] = re.sub(r"[<>]", "", title)[:100] or sn["title"]
+    if description is not None:
+        snippet["description"] = re.sub(r"[<>]", "", description)[:4900]
+    if tags is not None:
+        snippet["tags"] = tags[:15]
+    r = _check(httpx.put("https://www.googleapis.com/youtube/v3/videos", params={"part": "snippet"},
+                         json={"id": video_id, "snippet": snippet}, headers=head, timeout=30),
+               "Updating the video. " + _NEEDS_RECONNECT)
+    return r.json()["snippet"]
+
+
+def youtube_analytics(acc, video_ids: list, start: str, end: str) -> dict:
+    """Per-video numbers from YouTube Analytics, for dates like '2026-11-01'. Returns
+    {video id: {views, avg_view_pct, avg_view_sec, minutes_watched, subs_gained}}. avg_view_pct is how much of the
+    short people watched on average: the number that decides whether YouTube shows a short to more people."""
+    out = {}
+    head = {"Authorization": f"Bearer {_yt_token(acc)}"}
+    for i in range(0, len(video_ids), 200):
+        r = _check(httpx.get("https://youtubeanalytics.googleapis.com/v2/reports", params={
+            "ids": "channel==MINE", "startDate": start, "endDate": end, "dimensions": "video",
+            "metrics": "views,averageViewPercentage,averageViewDuration,estimatedMinutesWatched,subscribersGained",
+            "filters": "video==" + ",".join(video_ids[i:i + 200]), "maxResults": 200}, headers=head, timeout=30),
+            "Reading YouTube Analytics. " + _NEEDS_RECONNECT).json()
+        for row in r.get("rows", []):
+            out[row[0]] = {"views": row[1], "avg_view_pct": row[2], "avg_view_sec": row[3],
+                           "minutes_watched": row[4], "subs_gained": row[5]}
+    return out
+
+
+def youtube_traffic(acc, start: str, end: str) -> dict:
+    """Where the channel's views came from (the Shorts feed, search, browse...): {source: views}."""
+    r = _check(httpx.get("https://youtubeanalytics.googleapis.com/v2/reports", params={
+        "ids": "channel==MINE", "startDate": start, "endDate": end, "dimensions": "insightTrafficSourceType",
+        "metrics": "views", "sort": "-views"}, headers={"Authorization": f"Bearer {_yt_token(acc)}"}, timeout=30),
+        "Reading YouTube Analytics. " + _NEEDS_RECONNECT).json()
+    return {row[0]: row[1] for row in r.get("rows", [])}
 
 
 # ------------------------------------------------------------------ Instagram (Instagram Login, professional accounts)
