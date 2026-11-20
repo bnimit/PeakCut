@@ -100,9 +100,21 @@ def on_clip_ready(job, clip):
         creators.log(c["id"], f"Queued for {len(made)} account(s): {clip.get('title') or clip.get('hook')}")
 
 
-def _caption(clip, creator):
+def _footer(creator, job) -> str:
+    """The creator's own line, with {source} standing for whoever made the video this clip came from.
+
+    A recording of a live stream, or a file somebody uploaded, has no such name. The line is then left out
+    altogether rather than posted with a hole in it, so a credit never names nobody."""
+    line = (creator.get("post_footer") or "").strip()
+    if "{source}" not in line:
+        return line
+    who = ((job or {}).get("uploader") or "").strip()
+    return line.replace("{source}", who) if who else ""
+
+
+def _caption(clip, creator, job=None):
     tags = " ".join("#" + h for h in clip.get("hashtags", []))
-    return "\n\n".join(x for x in (clip.get("description", ""), tags, creator.get("post_footer", "")) if x)
+    return "\n\n".join(x for x in (clip.get("description", ""), tags, _footer(creator, job)) if x)
 
 
 def _post(p):
@@ -116,7 +128,7 @@ def _post(p):
             raise RuntimeError("That account was disconnected.")
         path = Path(job["dir"]) / "clips" / clip["file"]
         creator = creators.get(job["creator"]) or dict(creators.DEFAULTS, name="clips")
-        title, cap = clip.get("title") or clip.get("hook") or "Clip", _caption(clip, creator)
+        title, cap = clip.get("title") or clip.get("hook") or "Clip", _caption(clip, creator, job)
         if acc["platform"] == "youtube":
             rid, url = accounts.youtube_upload(acc, path, title, cap + "\n\n#Shorts", clip.get("hashtags", []), creator["privacy"])
         elif acc["platform"] == "instagram":
