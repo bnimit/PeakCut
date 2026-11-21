@@ -25,6 +25,7 @@ SCHEMA = {
             "description": {"type": "STRING"},
             "hashtags": {"type": "ARRAY", "items": {"type": "STRING"}},
             "highlight_words": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "restricted": {"type": "BOOLEAN"},
             "reason": {"type": "STRING"},
         },
         "required": ["start", "end", "score", "hook", "title", "description", "hashtags", "reason"],
@@ -55,6 +56,12 @@ Rules:
 - Start on the setup line, not mid-sentence. End right after the payoff or reaction, on the last word of a
   complete sentence: never in the middle of a sentence or a thought. The clip must make sense on its own.
 - Do not pick intros, sponsor reads, "like and subscribe", or dead air.
+- Pass over a moment whose point is shooting, beating or killing people, however loud it got. YouTube
+  age-restricts a short that dwells on realistic violence, and a restricted short is hidden from everyone
+  signed out or under 18 and earns almost nothing, so it is a bad clip no matter how exciting it looked.
+  A gun going off inside a chase, a crash or a joke is fine; it is the sustained fighting that is the problem.
+- restricted: true when the clip does dwell on violence like that, false when it does not. A clip marked true
+  is thrown away, so mark it true whenever you are not sure the clip would be safe to post.
 - Skip weak moments. Fewer strong clips beat many weak ones. Return [] if nothing is worth clipping.
 - score: 0-100, how likely a stranger keeps watching. Be honest; most clips are 50-80.
 - hook: at most 5 words, ALL CAPS, shown as big text on the video. Curiosity, but true to what happens.
@@ -83,7 +90,9 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]+")
 
 GAME_RULES = """
 This stream is {game}. Pick the moments that only mean something with that game in mind:
-- A play, a death, a jump scare, a glitch, a discovery, or the streamer reacting to one.
+- Best of all: a chase, a crash, a stunt, a glitch, a discovery, a jump scare, something an animal or a
+  passer-by in the game did, or the streamer reacting to one of those. A fight or a death counts too, but only
+  when the surprising or funny part is something other than the fighting.
 - The hook promises what is about to happen, in two to five words, and names something a viewer can picture:
   a number, a thing, or the turn it takes ("COPS IN 2 SECONDS", "1 VS 3", "HE FOUND BIGFOOT", "THE SHOT").
   Words that were really said are a hook only when those words are themselves the moment ("IT'S BIGFOOT!");
@@ -140,6 +149,20 @@ def _tidy(c, s, e, game=None):
         "highlight_words": [roman.to_roman(_text(h, 30)) for h in words][:8],
         "reason": _text(c.get("reason"), 200),
     }
+
+
+def _restricted(c) -> bool:
+    """Did the AI mark this moment as one YouTube would age-restrict? Such a clip is dropped: a restricted short
+    is hidden from everyone signed out or under 18, so it costs a slot and earns nothing.
+
+    No answer at all means no, so that a model which ignores the question still finds clips. But any answer that
+    is not plainly a no counts as a yes."""
+    if "restricted" not in c:
+        return False
+    v = c["restricted"]
+    if isinstance(v, bool) or v is None:
+        return bool(v)
+    return str(v).strip().lower() not in {"false", "no", "0", "none", ""}
 
 
 def _same_word(old, new):
@@ -295,7 +318,8 @@ def find_clips(words, db, duration, title="", uploader="", max_clips=6, min_len=
         try:
             out, used_model, spent = ask_ai(prompt, purpose="Video: finding clips")
             tokens += spent
-            found += [c for c in out if isinstance(c, dict) and a - 5 <= float(c.get("start", -1)) < b]
+            found += [c for c in out if isinstance(c, dict) and a - 5 <= float(c.get("start", -1)) < b
+                      and not _restricted(c)]
         except Exception as e:  # noqa: BLE001
             log(f"AI window {a:.0f}-{b:.0f}s failed: {e}")
     note = ""
@@ -327,7 +351,7 @@ def find_live_clips(words, z, now, chat=None, title="", uploader="", min_len=15,
               + RULES.format(min_len=min_len, max_len=max_len, transcript=_fmt(lines)))
     out, _model, spent = ask_ai(prompt, purpose="Live check")
     clips = []
-    for c in sorted((c for c in out if isinstance(c, dict)), key=lambda c: -_num(c.get("score"))):
+    for c in sorted((c for c in out if isinstance(c, dict) and not _restricted(c)), key=lambda c: -_num(c.get("score"))):
         s, e = _snap(c, lines, words, min_len, max_len, now)
         if e - s < min_len - 1 or _overlaps(s, e, list(existing) + clips):
             continue
@@ -445,7 +469,7 @@ def judge_transcript(words, start, now, title="", uploader="", min_len=15, max_l
               + RULES.format(min_len=min_len, max_len=max_len, transcript=_fmt(lines)))
     out, _model, spent = ask_ai(prompt, purpose="Live: words judge", timeout=timeout)
     clips = []
-    for c in sorted((c for c in out if isinstance(c, dict)), key=lambda c: -_num(c.get("score"))):
+    for c in sorted((c for c in out if isinstance(c, dict) and not _restricted(c)), key=lambda c: -_num(c.get("score"))):
         s, e = _snap(c, lines, words, min_len, max_len, now)
         if e - s < min_len - 1 or _overlaps(s, e, list(existing) + clips):
             continue

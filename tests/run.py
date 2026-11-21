@@ -63,6 +63,7 @@ def main() -> int:
                 ("answers that are not quite right", ["tests/test_answer.py"]),
                 ("knowing which game a stream is", ["tests/test_games.py"]),
                 ("telling an on-air channel from an off-air one", ["tests/test_live_detect.py"]),
+                ("dropping a clip YouTube would age-restrict", ["tests/test_restricted.py"]),
                 ("crediting whoever made the video a clip came from", ["tests/test_credit.py"]),
                 ("finding the facecam in a gaming stream", ["tests/test_facecam.py"]),
                 ("fresh installs: ffmpeg, the speech model, AI errors", ["tests/test_tools.py"]),
