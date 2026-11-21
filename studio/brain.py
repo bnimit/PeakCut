@@ -84,9 +84,11 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]+")
 GAME_RULES = """
 This stream is {game}. Pick the moments that only mean something with that game in mind:
 - A play, a death, a jump scare, a glitch, a discovery, or the streamer reacting to one.
-- The hook is what was said at that moment, or, if nothing was said, the name of what happened in
-  two or three words ("1 VS 3", "THE SHOT", "HE GOT ME", "CLUTCH"). Never a sentence that needs
-  the game explained.
+- The hook promises what is about to happen, in two to five words, and names something a viewer can picture:
+  a number, a thing, or the turn it takes ("COPS IN 2 SECONDS", "1 VS 3", "HE FOUND BIGFOOT", "THE SHOT").
+  Words that were really said are a hook only when those words are themselves the moment ("IT'S BIGFOOT!");
+  a line of ordinary talk is not a hook, however loud it was. Never the name of a mood or a kind of clip
+  ("CHAOS", "ROAD RAGE", "GOES WRONG", "EPIC FAIL"), and never a sentence that needs the game explained.
 - The title names the game when the clip is about it.
 - The hashtags include {tags}.
 """

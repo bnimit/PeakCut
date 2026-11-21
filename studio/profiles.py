@@ -223,9 +223,13 @@ def live_now(platform: str, url: str) -> dict:
         base = re.sub(r"/(live|videos|streams|featured)$", "", url)
         _, raw = _get(base + "/live")
         html = raw.decode("utf-8", "replace")
-        if '"isLiveNow":true' not in html:
+        # YouTube has used both of these to mark a channel that is on air right now. The old one stopped appearing
+        # in November 2026, which made every channel look offline, so both are accepted. A channel that is off air
+        # has neither.
+        if '"isLiveNow":true' not in html and '"isLive":true' not in html:
             return off
-        vid = (re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', html) or [None, ""])[1]
+        vid = (re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', html)
+               or re.search(r'"videoId":"([\w-]{11})"', html) or [None, ""])[1]
         out = {"live": True, "viewers": None, "title": _meta(html, "og:title"), "started": None, "embed": vid}
         try:
             i = _ydl_info(base + "/live")
