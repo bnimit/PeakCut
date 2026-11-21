@@ -105,5 +105,27 @@ check("the chat names of a whole stream are not kept", len(users) <= 700, True)
 check("the last few minutes of them still are", 2999 in users and min(users) >= 2999 - 660, True)
 check("the dict is not walked on every message", live._trim_names(users, 3005, 2999), 2999)
 
+# ---- the things people search for about a game, so the clip finder can aim at them
+# A clip that answers a question somebody is looking for travels; one that explains what nobody asked does not.
+# The list is only filled in for a game whose real search terms someone has looked up, so an unlisted game has
+# to get a general version of the same instruction rather than nothing or a made-up list.
+check("a game with real search terms has them", "how to make money" in games.looked_up("Grand Theft Auto VI"), True)
+check("its short name finds them too", games.looked_up("gta 6"), games.looked_up("Grand Theft Auto VI"))
+check("one of its tags finds them too", games.looked_up("GTA6"), games.looked_up("Grand Theft Auto VI"))
+check("a game nobody has filled in has none", games.looked_up("Elden Ring"), [])
+check("no game at all has none", games.looked_up(None), [])
+check("an unknown game has none", games.looked_up("Some Game That Does Not Exist"), [])
+check("the list handed out is a copy, so the real one cannot be edited by accident",
+      (lambda l: (l.append("junk"), "junk" not in games.looked_up("gta 6"))[1])(games.looked_up("gta 6")), True)
+
+gta, elden = brain._game_rules("gta 6"), brain._game_rules("Elden Ring")
+check("the searched-for rule reaches the AI for GTA 6", "how to make money" in gta, True)
+check("GTA 6 is told to write the title as the answer", "as the answer, not as a tease" in gta, True)
+check("a game with no list still gets the general rule", "where to find something" in elden, True)
+check("a game with no list is not given invented searches", "how to make money" in elden, False)
+check("both still get the rest of the game rules", ("sticky" not in gta) and ("The hashtags include" in elden), True)
+check("no game means no game rules at all", brain._game_rules(None), "")
+check("the rule leaves no empty gap behind it", "\n\n-" in gta, False)
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)

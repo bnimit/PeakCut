@@ -49,6 +49,20 @@ GAMES: list[tuple[str, list[str], list[str]]] = [
 # for a stream whose game nobody can name
 GENERIC = ["Gaming", "Gameplay", "GamingClips", "StreamHighlights"]
 
+# What people actually type into YouTube search about a game, so the clip finder can prefer the moments that
+# answer one of those questions. A clip that answers a question someone is looking for travels; one that
+# explains something nobody asked about does not, however good the moment was.
+#
+# Only fill a game in here from real search data, not from a guess about what sounds popular. The GTA VI list
+# below came from YouTube's own search suggestions on 21 November 2026, two days after the game came out, and
+# the suggestions are worth reading again every few weeks: what a new player looks up in the first week is not
+# what they look up in the second. A game that is not listed gets a general version of the same instruction.
+LOOKED_UP: dict[str, list[str]] = {
+    "Grand Theft Auto VI": ["how to make money", "where to find money", "how to buy a car", "where to sell a car",
+                            "where a particular place is, like the airport", "how to get the good ending",
+                            "what a particular named thing does, like the key cloner"],
+}
+
 # longest word first, so "gta 6" is read before "gta"
 _ALIASES: list[tuple[str, str, list[str]]] = sorted(
     ((alias, name, tags) for name, aliases, tags in GAMES for alias in aliases),
@@ -84,6 +98,11 @@ def name_of(game: str | None) -> str:
         if g == _norm(name) or g in {_norm(a) for a in aliases}:
             return name
     return str(game)[:40]
+
+
+def looked_up(game: str | None) -> list[str]:
+    """The things people search for about this game, or an empty list when nobody has filled them in yet."""
+    return list(LOOKED_UP.get(name_of(game), []))
 
 
 def tags_of(game: str | None) -> list[str]:

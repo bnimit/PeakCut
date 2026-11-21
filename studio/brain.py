@@ -90,9 +90,10 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]+")
 
 GAME_RULES = """
 This stream is {game}. Pick the moments that only mean something with that game in mind:
-- Best of all: a chase, a crash, a stunt, a glitch, a discovery, a jump scare, something an animal or a
-  passer-by in the game did, or the streamer reacting to one of those. A fight or a death counts too, but only
-  when the surprising or funny part is something other than the fighting.
+{searches}
+- Then: a chase, a crash, a stunt, a glitch, a discovery, a jump scare, something an animal or a passer-by
+  in the game did, or the streamer reacting to one of those. A fight or a death counts too, but only when
+  the surprising or funny part is something other than the fighting.
 - The hook promises what is about to happen, in two to five words, and names something a viewer can picture:
   a number, a thing, or the turn it takes ("COPS IN 2 SECONDS", "1 VS 3", "HE FOUND BIGFOOT", "THE SHOT").
   Words that were really said are a hook only when those words are themselves the moment ("IT'S BIGFOOT!");
@@ -286,13 +287,27 @@ def fallback_by_loudness(db, words, n, max_len, duration):
     return picks
 
 
+SEARCHED_FOR = """- Worth most of all: a moment that answers something a player would type into a search box. For this game
+  people look up {what}. A clip that shows one of those being done beats a louder moment that answers
+  nothing, so pick it when it is there, and write the title as the answer, not as a tease.
+"""
+
+SEARCHED_GENERAL = """- Worth most of all: a moment that answers something a player would type into a search box: how to get
+  something, where to find something, or what a particular named thing in the game does. A clip like that
+  beats a louder moment that answers nothing, so pick it when it is there, and write the title as the
+  answer, not as a tease.
+"""
+
+
 def _game_rules(game):
     """The extra rules for a known game, or nothing."""
     if not game:
         return ""
     tags = ", ".join(games.tags_of(game)) or "the game's own tags"
+    what = games.looked_up(game)
+    searches = (SEARCHED_FOR.format(what="; ".join(what)) if what else SEARCHED_GENERAL).rstrip()
     # The creator types the game in themselves, so it is treated like any other text from outside.
-    return GAME_RULES.format(game=_safe(games.name_of(game) or str(game), 40), tags=tags)
+    return GAME_RULES.format(game=_safe(games.name_of(game) or str(game), 40), tags=tags, searches=searches)
 
 
 def find_clips(words, db, duration, title="", uploader="", max_clips=6, min_len=15, max_len=60, log=print, game=None):
