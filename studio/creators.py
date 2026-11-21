@@ -19,7 +19,11 @@ DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "cap
             "plan": "free", "decide_mode": "both", "must_clip_min": 0, "min_gap_min": 2,
             "game": "",
             "trigger_words": "clip that, clip it",
-            "autopost": False, "accounts": [], "post_min_score": 75, "post_gap_min": 45, "daily_cap": 6,
+            # 150 minutes apart and six a day fills a waking day: 9:00, 11:30, 14:00, 16:30, 19:00, 21:30. At the
+            # old 45 minutes the whole day's posts went out before lunch and then nothing for twenty hours, so
+            # they competed with each other for the same spot in people's feeds instead of catching the morning,
+            # the afternoon and the evening. A creator that was set up before this keeps whatever is in its file.
+            "autopost": False, "accounts": [], "post_min_score": 75, "post_gap_min": 150, "daily_cap": 6,
             "privacy": "public", "post_footer": "", "rate_per_1k": 0.0, "channels": {}}
 PLATFORMS = ("youtube", "twitch", "kick")
 

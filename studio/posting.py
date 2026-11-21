@@ -52,15 +52,34 @@ def _mirror(p):
         jobs.save(job)
 
 
+DAY_START, DAY_END = 9, 22      # posts go out between these hours, the clock on this machine
+
+
+def _at_hour(t, hour, tomorrow=False):
+    """The given hour on t's own day, or on the day after it."""
+    lt = time.localtime(t + (86400 if tomorrow else 0))
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, hour, 0, 0, 0, 0, -1))
+
+
 def _next_slot(account_id, gap_min, cap):
-    """Earliest time that respects the gap between posts and the daily cap for this account."""
+    """Earliest time that respects the gap between posts, the daily cap, and the hours people are awake.
+
+    The gap alone used to decide this, so a day's posts could run off the end of the evening and carry on
+    through the night: with a wide gap the fifth and sixth of the day landed at two and five in the morning.
+    A slot outside the posting hours now waits for the next morning instead."""
     mine = [p for p in _mine() if p["account"] == account_id and p["status"] in OPEN + ("posted",)]
     t = max(time.time(), max((p.get("posted_at") or p["due_at"] for p in mine), default=0) + gap_min * 60)
-    for _ in range(30):
+    for _ in range(60):
+        hour = time.localtime(t).tm_hour
+        if hour < DAY_START:                 # the small hours: wait for this morning
+            t = _at_hour(t, DAY_START)
+            continue
+        if hour >= DAY_END:                  # past the evening: wait for tomorrow morning
+            t = _at_hour(t, DAY_START, tomorrow=True)
+            continue
         if sum(1 for p in mine if _day(p.get("posted_at") or p["due_at"]) == _day(t)) < cap:
             break
-        lt = time.localtime(t + 86400)
-        t = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 9, 0, 0, 0, 0, -1))  # 9:00 next day
+        t = _at_hour(t, DAY_START, tomorrow=True)
     return t
 
 
