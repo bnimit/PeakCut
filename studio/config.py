@@ -138,6 +138,14 @@ STATIC_MIN_SECONDS = float(env("PEAKCUT_STATIC_MIN_SECONDS", "6"))
 # How long one AI answer may take on a live stream. It is short on purpose: while the AI thinks, the
 # recording carries on, so a slow answer costs a check, not the stream.
 LIVE_AI_TIMEOUT = float(env("PEAKCUT_LIVE_AI_TIMEOUT", "45"))
+# Queued clips go out between these two hours of the clock, so a day's posts catch the morning, the afternoon and
+# the evening instead of running on through the night. By default the hours are read on this machine's own clock,
+# which is what you want when your viewers are where you are. When they are not, name their timezone in
+# PEAKCUT_POST_TZ (for example America/New_York) and the hours are read there instead: a laptop in India then
+# posts into the American afternoon rather than the American small hours, where nobody would see the clip.
+POST_TZ = env("PEAKCUT_POST_TZ", "").strip()
+POST_START = max(0, min(23, int(env("PEAKCUT_POST_START") or 9)))
+POST_END = max(POST_START + 1, min(24, int(env("PEAKCUT_POST_END") or 22)))
 
 for d in (USERS_DIR, MODELS_DIR, TMP_DIR, FONTS_DIR):
     d.mkdir(parents=True, exist_ok=True)

@@ -86,5 +86,61 @@ check("each day starts at nine",
       {time.strftime("%H:%M", time.localtime(t)) for t in out if posting._day(t) != posting._day(out[0])}
       >= {"09:00"}, True)
 
+# ---- the hours belong to the viewers, not to the machine
+#      A channel run from India for an American audience used to post all through the American night: 09:00 in
+#      India is 22:30 the evening before in New York. Naming the viewers' timezone moves the whole window there.
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except Exception:  # noqa: BLE001
+    ET = None      # a machine with no timezone database: these checks cannot run, the rest still can
+
+check("no timezone set means this machine's own clock", posting._resolve_zone(""), None)
+check("a name that is not a timezone falls back to this machine's clock", posting._resolve_zone("Nowhere/Fake"), None)
+
+if ET is None:
+    print("(no timezone database on this machine, so the viewers'-timezone checks were skipped)")
+else:
+    check("a real timezone name is used", posting._resolve_zone("America/New_York") is not None, True)
+    posting.ZONE = ET
+
+    def et(hhmm, day="2026-11-22"):
+        h, m = (int(x) for x in hhmm.split(":"))
+        y, mo, d = (int(x) for x in day.split("-"))
+        return datetime(y, mo, d, h, m, tzinfo=ET).timestamp()
+
+    def et_when(t):
+        return datetime.fromtimestamp(t, ET).strftime("%Y-%m-%d %H:%M")
+
+    check("the middle of the night where the viewers are waits for their morning",
+          et_when(given([], et("03:00"))), "2026-11-22 09:00")
+    check("after the evening where the viewers are, it waits for their next morning",
+          et_when(given([], et("23:00"))), "2026-11-23 09:00")
+    check("the middle of their afternoon is posted straight away",
+          et_when(given([], et("14:00"))), "2026-11-22 14:00")
+
+    posting._posts[:] = []
+    posting._mine = lambda: list(posting._posts)
+    now = et("09:00")
+    posting.time.time = lambda: now
+    out = []
+    for _ in range(14):
+        t = posting._next_slot(ACC, 150, 6)
+        out.append(t)
+        posting._posts.append({"id": "z%d" % len(out), "user": "u_local", "account": ACC, "status": "scheduled",
+                               "due_at": t, "posted_at": None})
+    hrs = [datetime.fromtimestamp(t, ET).hour for t in out]
+    check("a batch of 14 stays inside the hours where the viewers are",
+          all(posting.DAY_START <= h < posting.DAY_END for h in hrs), True)
+    check("none of the 14 lands in the viewers' small hours", all(not (0 <= h < 9) for h in hrs), True)
+    check("six land on the viewers' first day",
+          sum(1 for t in out if posting._slot_day(t) == posting._slot_day(out[0])), 6)
+    check("the first one is nine in the morning where the viewers are", et_when(out[0]), "2026-11-22 09:00")
+    check("each later day starts at nine where the viewers are",
+          {datetime.fromtimestamp(t, ET).strftime("%H:%M") for t in out
+           if posting._slot_day(t) != posting._slot_day(out[0])} >= {"09:00"}, True)
+    posting.ZONE = None
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)

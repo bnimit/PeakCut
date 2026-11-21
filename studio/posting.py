@@ -52,13 +52,44 @@ def _mirror(p):
         jobs.save(job)
 
 
-DAY_START, DAY_END = 9, 22      # posts go out between these hours, the clock on this machine
+DAY_START, DAY_END = config.POST_START, config.POST_END    # posts go out between these hours
+
+
+def _resolve_zone(name):
+    """The timezone the posting hours are read in. Nothing set means this machine's own clock."""
+    if not name:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001
+        # Not a timezone name, or this machine has no timezone database. Posting on this machine's clock is
+        # better than not posting at all, so say so plainly and carry on.
+        print(f"PEAKCUT_POST_TZ is not a timezone this machine knows: {name!r}. "
+              f"Posting hours will follow this machine's clock instead.")
+        return None
+
+
+ZONE = _resolve_zone(config.POST_TZ)
+
+
+def _there(t):
+    """The wall clock where the viewers are. With no timezone set this is this machine's own clock."""
+    from datetime import datetime
+    return datetime.fromtimestamp(t, ZONE)
+
+
+def _slot_day(t):
+    """Which day a post belongs to where the viewers are, so a cap of six a day means six of their days.
+    Kept apart from _day, which stays on this machine's clock because that is the one the dashboard shows you."""
+    return _there(t).strftime("%Y-%m-%d")
 
 
 def _at_hour(t, hour, tomorrow=False):
-    """The given hour on t's own day, or on the day after it."""
-    lt = time.localtime(t + (86400 if tomorrow else 0))
-    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, hour, 0, 0, 0, 0, -1))
+    """That hour of the clock where the viewers are, on their own day holding t, or on the day after it."""
+    from datetime import timedelta
+    d = _there(t) + timedelta(days=1 if tomorrow else 0)
+    return d.replace(hour=hour, minute=0, second=0, microsecond=0).timestamp()
 
 
 def _next_slot(account_id, gap_min, cap):
@@ -66,18 +97,21 @@ def _next_slot(account_id, gap_min, cap):
 
     The gap alone used to decide this, so a day's posts could run off the end of the evening and carry on
     through the night: with a wide gap the fifth and sixth of the day landed at two and five in the morning.
-    A slot outside the posting hours now waits for the next morning instead."""
+    A slot outside the posting hours now waits for the next morning instead.
+
+    "Awake" means where the viewers are, not where this machine is. Those are the same place until you set
+    PEAKCUT_POST_TZ; a channel watched from another country would otherwise post all day into an empty feed."""
     mine = [p for p in _mine() if p["account"] == account_id and p["status"] in OPEN + ("posted",)]
     t = max(time.time(), max((p.get("posted_at") or p["due_at"] for p in mine), default=0) + gap_min * 60)
     for _ in range(60):
-        hour = time.localtime(t).tm_hour
+        hour = _there(t).hour
         if hour < DAY_START:                 # the small hours: wait for this morning
             t = _at_hour(t, DAY_START)
             continue
         if hour >= DAY_END:                  # past the evening: wait for tomorrow morning
             t = _at_hour(t, DAY_START, tomorrow=True)
             continue
-        if sum(1 for p in mine if _day(p.get("posted_at") or p["due_at"]) == _day(t)) < cap:
+        if sum(1 for p in mine if _slot_day(p.get("posted_at") or p["due_at"]) == _slot_day(t)) < cap:
             break
         t = _at_hour(t, DAY_START, tomorrow=True)
     return t
