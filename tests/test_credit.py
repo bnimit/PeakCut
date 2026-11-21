@@ -38,6 +38,14 @@ check("a plain line is kept when there is a name",
 check("a plain line is kept when there is none", posting._footer(PLAIN, {}), "Clips from the original creators.")
 check("no line set means no line", posting._footer({}, {"uploader": "Betaz"}), "")
 
+# ---- a clip from a pasted link belongs to no creator, so it falls back to these settings. They used to carry
+# no line at all, which posted somebody else's work crediting nobody.
+from studio import creators
+check("the credit line is on by default", "{source}" in creators.DEFAULTS["post_footer"], True)
+check("a clip with no creator still credits the uploader",
+      posting._footer(creators.DEFAULTS, {"uploader": "T5G"}), "Clipped from T5G's video. All credit to them.")
+check("a recording with no uploader still drops the line", posting._footer(creators.DEFAULTS, {}), "")
+
 # ---- and the caption built from it
 cap = posting._caption(CLIP, CREDIT, {"uploader": "GamingBolt"})
 check("the caption ends with the credit", cap.endswith("Clipped from GamingBolt's video. All credit to them."), True)

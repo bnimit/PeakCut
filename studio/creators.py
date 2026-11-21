@@ -24,7 +24,12 @@ DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "cap
             # they competed with each other for the same spot in people's feeds instead of catching the morning,
             # the afternoon and the evening. A creator that was set up before this keeps whatever is in its file.
             "autopost": False, "accounts": [], "post_min_score": 75, "post_gap_min": 150, "daily_cap": 6,
-            "privacy": "public", "post_footer": "", "rate_per_1k": 0.0, "channels": {}}
+            # A clip is somebody else's work, so the post says whose by default. {source} becomes the name of
+            # whoever uploaded the video it came from; a recording or a file you uploaded has no such name, and
+            # then the line is left out rather than posted with a hole in it. This used to be empty, so a clip
+            # from a pasted link, which belongs to no creator, went out crediting nobody.
+            "privacy": "public", "post_footer": "Clipped from {source}'s video. All credit to them.",
+            "rate_per_1k": 0.0, "channels": {}}
 PLATFORMS = ("youtube", "twitch", "kick")
 
 
