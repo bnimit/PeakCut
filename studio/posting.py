@@ -44,12 +44,17 @@ def _day(t):
 
 
 def _mirror(p):
-    """Copy the post's state onto its clip so the clip card can show it."""
-    job = jobs.get(p["job"])
-    clip = next((c for c in job["clips"] if c["id"] == p["clip"]), None) if job else None
-    if clip is not None:
-        clip.setdefault("posts", {})[p["id"]] = {k: p.get(k) for k in ("account_name", "platform", "status", "url", "due_at", "error")}
-        jobs.save(job)
+    """Copy the post's state onto its clip so the clip card can show it.
+
+    Held under the lock because clips of one video are posted at the same time now: reading the video, changing
+    one clip and writing the whole thing back is only safe one at a time, or two clips finishing together would
+    each save a copy that does not know about the other."""
+    with _lock:
+        job = jobs.get(p["job"])
+        clip = next((c for c in job["clips"] if c["id"] == p["clip"]), None) if job else None
+        if clip is not None:
+            clip.setdefault("posts", {})[p["id"]] = {k: p.get(k) for k in ("account_name", "platform", "status", "url", "due_at", "error")}
+            jobs.save(job)
 
 
 DAY_START, DAY_END = config.POST_START, config.POST_END    # posts go out between these hours
@@ -205,20 +210,54 @@ def _post(p):
     _mirror(p)
 
 
+POST_WORKERS = 3    # uploads happening at once; see _run
+
+
+def _post_one(p):
+    """One post, on a thread of its own, so a slow upload holds up only itself.
+
+    _post deals with anything the upload itself can throw. This catches what is left: if saving or writing the
+    clip card fails, the post would otherwise sit on "posting" for ever, which is how a clip goes quiet and
+    nobody notices. It goes back in the queue instead."""
+    try:
+        with ctx.as_user(p["user"]):
+            _post(p)
+    except Exception as e:  # noqa: BLE001
+        with _lock:
+            if p["status"] == "posting":
+                p.update(status="scheduled", due_at=time.time() + 600, error=str(e)[-300:])
+                _save()
+
+
 def _run():
+    """Send out whatever is due, a few at a time.
+
+    This used to upload one post at a time and wait for each. One slow upload then held up every other post
+    behind it: six clips sent together went out over a quarter of an hour, and a single stuck upload stopped
+    the queue completely. Each upload now gets its own thread, with a few at once rather than all of them, so
+    one bad one costs only itself and the channel is not flooded either."""
+    running = []
     while True:
         time.sleep(15)
-        due = [p for p in list(_posts) if p["status"] == "scheduled" and p["due_at"] <= time.time() and p.get("user")]
+        running = [t for t in running if t.is_alive()]
+        due = sorted((p for p in list(_posts)
+                      if p["status"] == "scheduled" and p["due_at"] <= time.time() and p.get("user")),
+                     key=lambda p: p["due_at"])            # oldest first, so nothing waits for ever
         for p in due:
+            if len(running) >= POST_WORKERS:
+                break
             try:
                 with ctx.as_user(p["user"]):
                     if accounts.settings()["paused"]:
                         continue
-                    with _lock:
-                        if p["status"] != "scheduled":
-                            continue
-                        p["status"] = "posting"
-                    _post(p)
+                with _lock:
+                    if p["status"] != "scheduled":          # already claimed by another pass
+                        continue
+                    p["status"] = "posting"
+                    _save()        # saved, so the page shows it going out instead of looking like nothing happened
+                t = threading.Thread(target=_post_one, args=(p,), daemon=True)
+                t.start()
+                running.append(t)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -328,7 +367,10 @@ def start():
     with _lock:
         for p in _posts:
             if p["status"] == "posting":  # interrupted mid-upload last time
-                p.update(status="failed", error="The studio closed during this upload. Check the account, then retry.")
+                # Not retried on its own: an upload stopped halfway may still have finished at the other end,
+                # and retrying it blind would put the same clip up twice.
+                p.update(status="failed", error="The studio closed during this upload. The clip may already be "
+                                                "on the channel, so look there before posting it again.")
         _save()
     jobs.on_clip_ready.append(on_clip_ready)
     threading.Thread(target=_run, daemon=True).start()

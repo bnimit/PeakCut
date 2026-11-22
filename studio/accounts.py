@@ -342,6 +342,13 @@ def _yt_token(acc) -> str:
     return acc["access_token"]
 
 
+# Sending the file can fairly take a quarter of an hour on a slow line; waiting for the answer afterwards should
+# not take anything like that. They used to share one fifteen-minute limit, so when YouTube took the whole file
+# and then lost the reply, we sat holding the line for fifteen minutes. Now the sending keeps its long limit and
+# the answer gets two minutes, after which we ask whether the video arrived.
+UPLOAD_TIMEOUT = httpx.Timeout(connect=30.0, write=900.0, read=120.0, pool=30.0)
+
+
 def youtube_upload(acc, path: Path, title: str, description: str, tags: list, privacy: str):
     token = _yt_token(acc)
     meta = {"snippet": {"title": re.sub(r"[<>]", "", title)[:100] or "Clip", "description": re.sub(r"[<>]", "", description)[:4900],
@@ -356,7 +363,8 @@ def youtube_upload(acc, path: Path, title: str, description: str, tags: list, pr
         body = f.read()
     try:
         done = _check(httpx.put(start.headers["Location"], content=body,
-                                headers={"Authorization": f"Bearer {token}", "Content-Type": "video/mp4"}, timeout=900),
+                                headers={"Authorization": f"Bearer {token}", "Content-Type": "video/mp4"},
+                                timeout=UPLOAD_TIMEOUT),
                       "Uploading to YouTube").json()
     except Exception:  # noqa: BLE001
         # The upload did not answer us. That is not the same as the video not being there: YouTube can take the
