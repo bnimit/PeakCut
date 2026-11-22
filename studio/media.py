@@ -19,6 +19,7 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # minutes, with a clear message, instead of each one waiting to fail. Then the next link simply tries again.
 YT_PAUSE = 600
 _yt_refused_until = 0.0
+_use_ipv4 = False          # set once YouTube turns the new-style address away; see note_refusal
 YT_BLOCKED = ("YouTube isn't letting PeakCut download videos right now. Upload the video file instead, or use a "
               "Twitch or Kick link. An admin can fix this by adding YouTube cookies under Settings, Connected apps. "
               "YouTube links will be tried again in a few minutes.")
@@ -46,9 +47,18 @@ def check_youtube(url: str):
 
 
 def note_refusal(url: str, err) -> bool:
-    """If this error is YouTube refusing the server, pause YouTube links for a while. True if it was."""
-    global _yt_refused_until
+    """If this error is YouTube refusing the server, pause YouTube links for a while. True if it was.
+
+    One thing is tried before giving up. Many home connections now have both an old-style address (IPv4) and a
+    new-style one (IPv6), and the machine prefers the new one. YouTube turns away whole ranges of new-style
+    addresses without ever asking the old one, so the same connection is refused one way and welcome the other.
+    The first refusal therefore switches to the old-style address and does not start the pause: the next link
+    simply works. Only a refusal that happens on the old address too is a real refusal."""
+    global _yt_refused_until, _use_ipv4
     if is_youtube(url) and _BOT_CHECK.search(str(err)):
+        if not _use_ipv4 and not config.FORCE_IPV4:
+            _use_ipv4 = True       # try the old-style address from now on, and let this link be tried again
+            return False
         _yt_refused_until = time.time() + YT_PAUSE
         return True
     return False
@@ -101,12 +111,20 @@ def cookie_opts() -> dict:
     return {"cookiefile": str(config.YT_COOKIES)} if config.YT_COOKIES.is_file() else {}
 
 
+def address_opts() -> dict:
+    """Ask for the old-style address (IPv4) when the new-style one is being turned away.
+
+    "0.0.0.0" means "any of this machine's old-style addresses", not a particular one, so this works on any
+    connection. Set PEAKCUT_FORCE_IPV4=1 to start out this way and skip the one refusal it takes to learn."""
+    return {"source_address": "0.0.0.0"} if _use_ipv4 or config.FORCE_IPV4 else {}
+
+
 def _ydl(opts):
     import yt_dlp
     # a channel or playlist link is answered as "a list" straight away, never walked video by video
     return yt_dlp.YoutubeDL({"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
                              "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
-                             "concurrent_fragment_downloads": 4, **cookie_opts(), **opts})
+                             "concurrent_fragment_downloads": 4, **cookie_opts(), **address_opts(), **opts})
 
 
 def _video_format(height):

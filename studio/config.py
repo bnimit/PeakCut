@@ -156,6 +156,11 @@ LIVE_AI_TIMEOUT = float(env("PEAKCUT_LIVE_AI_TIMEOUT", "45"))
 # which is what you want when your viewers are where you are. When they are not, name their timezone in
 # PEAKCUT_POST_TZ (for example America/New_York) and the hours are read there instead: a laptop in India then
 # posts into the American afternoon rather than the American small hours, where nobody would see the clip.
+# Many home connections now have both an old-style address (IPv4) and a new-style one (IPv6), and the machine
+# prefers the new one. YouTube turns away whole ranges of new-style addresses with "sign in to confirm you're
+# not a bot", while the very same connection is served fine on the old one. PeakCut notices this and switches by
+# itself after the first refusal; set this to 1 to start out that way and skip that one refusal.
+FORCE_IPV4 = env("PEAKCUT_FORCE_IPV4", "0") == "1"
 POST_TZ = env("PEAKCUT_POST_TZ", "").strip()
 POST_START = max(0, min(23, int(env("PEAKCUT_POST_START") or 9)))
 POST_END = max(POST_START + 1, min(24, int(env("PEAKCUT_POST_END") or 22)))

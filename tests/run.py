@@ -76,6 +76,7 @@ def main() -> int:
                 ("crediting whoever made the video a clip came from", ["tests/test_credit.py"]),
                 ("never posting a clip twice when YouTube loses the receipt", ["tests/test_upload_recovery.py"]),
                 ("one slow upload not holding up the rest", ["tests/test_queue_blocking.py"]),
+                ("YouTube refusing the new-style address, not the server", ["tests/test_ipv6.py"]),
                 ("finding the facecam in a gaming stream", ["tests/test_facecam.py"]),
                 ("recording time: the buffer knows where each piece sits", ["tests/test_live_times.py"]),
                 ("fresh installs: ffmpeg, the speech model, AI errors", ["tests/test_tools.py"]),

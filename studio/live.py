@@ -72,7 +72,7 @@ def resolve(url: str) -> dict:
     """Ask yt-dlp for the stream's playable address. Raises NotLive if the channel is offline."""
     import yt_dlp
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "logger": _Quiet(),
-            "format": _live_format(config.LIVE_HEIGHT), **media.cookie_opts()}
+            "format": _live_format(config.LIVE_HEIGHT), **media.cookie_opts(), **media.address_opts()}
     if media.is_youtube(url) and media.youtube_paused():
         raise NotLive(media.YT_BLOCKED)
     try:
