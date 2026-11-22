@@ -151,5 +151,26 @@ check("the rules carry its real search terms, not the general wording",
       "gold" in rules and "nobody asked about" not in rules, True)
 check("and still tell the AI to write the title as the answer", "not as a tease" in rules, True)
 
+
+# ---- Gears of War: E-Day, added 22 Nov 2026 as a third game. Its suggestions had no "where to" cluster at all:
+#      a linear shooter sends people looking for skill and settings, not places.
+check("E-Day is recognised", games.name_of("gears of war e-day"), "Gears of War: E-Day")
+check("and without the hyphen", games.name_of("Gears of War EDay"), "Gears of War: E-Day")
+check("and by the short name", games.name_of("gears e day"), "Gears of War: E-Day")
+check("it carries its own tags", "GearsEDay" in games.tags_of("gears of war e-day"), True)
+check("its clearest tag comes first", games.tags_of("gears e day")[0], "GearsOfWar")
+check("a title naming it is detected", games.detect("Gears of War E-Day Horde Siege guide")[0], "Gears of War: E-Day")
+# the older games must not be mistaken for the new one
+check("a Gears 5 video is not called E-Day", games.detect("Gears 5 best horde classes")[0], None)
+check("plain Gears of War is not called E-Day either", games.detect("Gears of War retrospective")[0], None)
+check("its search terms are filled in", len(games.looked_up("Gears of War: E-Day")) >= 5, True)
+check("they are about settings, which is what people actually ask",
+      any("settings" in t for t in games.looked_up("gears e day")), True)
+check("and about getting better at it", any("better" in t for t in games.looked_up("gears of war e-day")), True)
+rules = brain._game_rules("Gears of War: E-Day")
+check("the game rules name it", "Gears of War: E-Day" in rules, True)
+check("the rules carry its real terms, not the general wording",
+      "wall bounce" in rules and "nobody asked about" not in rules, True)
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)

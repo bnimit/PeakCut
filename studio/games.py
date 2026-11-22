@@ -50,6 +50,10 @@ GAMES: list[tuple[str, list[str], list[str]]] = [
     # as the exclamation as often as the game.
     ("World of Warcraft", ["world of warcraft", "wow forever", "wow classic", "warcraft"],
      ["WorldOfWarcraft", "WoWForever", "WoW", "Warcraft", "MMORPG"]),
+    # Only the E-Day spellings, deliberately: "gears of war" on its own would also catch a Gears 5 video and
+    # tag it as the new game, which is worse than not recognising it at all.
+    ("Gears of War: E-Day", ["gears of war e day", "gears of war eday", "gears e day", "gears eday"],
+     ["GearsOfWar", "GearsEDay", "EDay", "Gears", "Xbox"]),
 ]
 
 # for a stream whose game nobody can name
@@ -76,6 +80,15 @@ LOOKED_UP: dict[str, list[str]] = {
                           "how to fish, cook or raise a profession",
                           "where a particular place or item is, like the Hall of Thanes",
                           "which addons and settings to use"],
+    # From YouTube's own suggestions on 22 November 2026, seven weeks after E-Day came out. Worth noticing what
+    # is missing: asking "where" returned nothing at all. It is a linear shooter, so nobody is looking for
+    # places the way they do in GTA or WoW. They want to be better at it, and they want their settings right.
+    "Gears of War: E-Day": ["which settings to use, especially controller and graphics settings",
+                            "which weapon, mod, class or Horde build to pick",
+                            "how to wall bounce, and the other moves that make someone better at it",
+                            "how to level up fast, and how to re-up",
+                            "how to play Horde Siege and which classes suit it",
+                            "how to play in split screen"],
 }
 
 # longest word first, so "gta 6" is read before "gta"
