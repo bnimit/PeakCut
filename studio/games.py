@@ -46,8 +46,10 @@ GAMES: list[tuple[str, list[str], list[str]]] = [
     ("Grand Theft Auto: San Andreas", ["grand theft auto san andreas", "gta sa"], ["GTA", "SanAndreas"]),
     # "wow" on its own is deliberately not one of the words that mean this game: half the clip titles on YouTube
     # say "WOW" about something else entirely, and a Fortnite clip tagged #WorldOfWarcraft helps nobody.
+    # The first tag is the one a clip is most likely to get, so it is the clearest one: "WoW" on its own reads
+    # as the exclamation as often as the game.
     ("World of Warcraft", ["world of warcraft", "wow forever", "wow classic", "warcraft"],
-     ["WoW", "WoWForever", "WorldOfWarcraft", "Warcraft", "MMORPG"]),
+     ["WorldOfWarcraft", "WoWForever", "WoW", "Warcraft", "MMORPG"]),
 ]
 
 # for a stream whose game nobody can name

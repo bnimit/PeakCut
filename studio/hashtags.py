@@ -59,8 +59,13 @@ def numbered(title) -> list:
 
 
 def keywords(text, title="", count=2) -> list:
-    """The words that matter most in what was said: said more than once, or a name (capitalised in the middle
-    of a sentence), and more so if the title has them too."""
+    """The words worth searching for in what was said: a name (capitalised in the middle of a sentence), or a
+    word the title uses too. Whichever it is, saying it often moves it up the list.
+
+    Being said a lot is not on its own enough, and used to be: any word repeated twice could become a tag, so
+    real posts went out wearing #instead, #hours, #character and #return. Nobody searches for those, and five
+    of them on a post is a sign the thing was made by a machine. A word now has to be a name or in the title,
+    which is what "worth searching for" actually looks like in a clip about one thing."""
     raw = str(text or "").split()
     in_title = {w.lower() for w in _WORD.findall(str(title or ""))}
     score = {}
@@ -68,10 +73,17 @@ def keywords(text, title="", count=2) -> list:
         m = _WORD.search(r)
         if not m:
             continue
-        w = m.group(0).strip("'").lower()
+        got = m.group(0)
+        # "you'll" is not the word "youll": take what comes before the apostrophe and judge that, or the
+        # contractions of ordinary words sail past the stop list in a shape it does not list.
+        if "'" in got and got.split("'")[0].lower() in STOP:
+            continue
+        w = got.strip("'").lower()
         if w in STOP or len(w) < 4 or not _tag(w):
             continue
         name = r[:1].isupper() and i > 0 and raw[i - 1][-1:] not in ".?!"
+        if not (name or w in in_title):
+            continue
         score[w] = score.get(w, 0) + 1 + (2 if name else 0) + (2 if w in in_title else 0)
     best = sorted((w for w in score if score[w] >= 2), key=lambda w: (-score[w], -len(w), w))
     return best[:count]
@@ -86,13 +98,22 @@ def make(text="", title="", uploader="", game=None, category="other", ai_tags=()
         if t and t not in out and len(out) < limit:
             out.append(t)
 
+    # A word already sitting inside the game's own tag says nothing on its own: #WoWForever should not drag
+    # #forever along behind it, nor #GTA6 bring #gta.
+    inside_game_tag = {t.lower() for t in games.tags_of(game)}
+
+    def spare(t):
+        t = _tag(t)
+        return bool(t) and not any(t != g and t in g for g in inside_game_tag)
+
     for t in games.tags_of(game)[:1]:       # the game's main tag; its look-alikes would only use up the room
         add(t)
     add(channel_tag(uploader))
     for t in list(ai_tags or [])[:2]:
         add(t)
     for t in keywords(text, title):
-        add(t)
+        if spare(t):
+            add(t)
     for t in numbered(title)[:1]:
         add(t)
     add(CATEGORY_TAGS.get(str(category or "").lower(), ""))
