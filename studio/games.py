@@ -44,6 +44,10 @@ GAMES: list[tuple[str, list[str], list[str]]] = [
     ("Apex Legends", ["apex legends"], ["ApexLegends", "EApex"]),
     ("PUBG", ["pubg", "playerunknown"], ["PUBG", "BattleRoyale"]),
     ("Grand Theft Auto: San Andreas", ["grand theft auto san andreas", "gta sa"], ["GTA", "SanAndreas"]),
+    # "wow" on its own is deliberately not one of the words that mean this game: half the clip titles on YouTube
+    # say "WOW" about something else entirely, and a Fortnite clip tagged #WorldOfWarcraft helps nobody.
+    ("World of Warcraft", ["world of warcraft", "wow forever", "wow classic", "warcraft"],
+     ["WoW", "WoWForever", "WorldOfWarcraft", "Warcraft", "MMORPG"]),
 ]
 
 # for a stream whose game nobody can name
@@ -61,6 +65,15 @@ LOOKED_UP: dict[str, list[str]] = {
     "Grand Theft Auto VI": ["how to make money", "where to find money", "how to buy a car", "where to sell a car",
                             "where a particular place is, like the airport", "how to get the good ending",
                             "what a particular named thing does, like the key cloner"],
+    # From YouTube's own suggestions on 22 November 2026, three weeks after Forever came out. What people ask
+    # about a long-running game is not what they ask about a brand new one: almost every suggestion was about
+    # choosing and playing a class, not about the story.
+    "World of Warcraft": ["which class or race to pick, and which is best at tanking, healing or damage",
+                          "how to play a particular class", "how to make gold",
+                          "where to level, often for a particular range like 20 to 30", "where to start",
+                          "how to fish, cook or raise a profession",
+                          "where a particular place or item is, like the Hall of Thanes",
+                          "which addons and settings to use"],
 }
 
 # longest word first, so "gta 6" is read before "gta"

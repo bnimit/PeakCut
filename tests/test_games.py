@@ -127,5 +127,29 @@ check("both still get the rest of the game rules", ("sticky" not in gta) and ("T
 check("no game means no game rules at all", brain._game_rules(None), "")
 check("the rule leaves no empty gap behind it", "\n\n-" in gta, False)
 
+
+# ---- World of Warcraft, added 22 Nov 2026 as a second game for the clips channel. Its search terms came from
+#      YouTube's own suggestions, which were overwhelmingly about picking and playing a class.
+check("World of Warcraft is recognised by its full name", games.name_of("world of warcraft"), "World of Warcraft")
+check("and by the expansion people are playing", games.name_of("WoW Forever"), "World of Warcraft")
+check("and by WoW Classic", games.name_of("wow classic"), "World of Warcraft")
+check("it carries its own tags", "WorldOfWarcraft" in games.tags_of("World of Warcraft"), True)
+check("including the expansion's tag", "WoWForever" in games.tags_of("wow forever"), True)
+check("a title naming the game is detected", games.detect("WoW Forever leveling guide 1-60")[0], "World of Warcraft")
+check("so is the full name in a title", games.detect("World of Warcraft Forever: best class")[0], "World of Warcraft")
+# the point of leaving "wow" out on its own
+check("a clip that just says wow is not called World of Warcraft",
+      games.detect("WOW! This GTA 6 chase was insane")[0], "Grand Theft Auto VI")
+check("and wow with nothing else is no game at all", games.detect("wow that was close")[0], None)
+check("its search terms are filled in", len(games.looked_up("World of Warcraft")) >= 6, True)
+check("they are about classes, which is what people actually ask",
+      any("class" in t for t in games.looked_up("wow forever")), True)
+check("and about gold", any("gold" in t for t in games.looked_up("World of Warcraft")), True)
+rules = brain._game_rules("World of Warcraft")
+check("the game rules name it", "World of Warcraft" in rules, True)
+check("the rules carry its real search terms, not the general wording",
+      "gold" in rules and "nobody asked about" not in rules, True)
+check("and still tell the AI to write the title as the answer", "not as a tease" in rules, True)
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)
