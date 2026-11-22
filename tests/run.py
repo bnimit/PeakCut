@@ -27,6 +27,9 @@ def main() -> int:
            "PEAKCUT_SMTP_HOST": "", "PEAKCUT_VERIFY_EMAIL": "1",   # the tests cover the confirm-your-email rule
            "GOOGLE_CLIENT_ID": "", "GOOGLE_CLIENT_SECRET": "", "GOOGLE_CLIENT_FILE": "", "PYTHONUNBUFFERED": "1",
            "PEAKCUT_AI_KEY": "", "PEAKCUT_AI_KEY_FILE": "", "PEAKCUT_AI_MODELS": "",
+           # the posting window is pinned too, so the suite tests one known setting and not whatever this
+           # machine's .env happens to say about where its viewers are
+           "PEAKCUT_POST_TZ": "", "PEAKCUT_POST_START": "9", "PEAKCUT_POST_END": "22",
            "PEAKCUT_UPLOAD_PART_MB": "5", "PEAKCUT_MAX_UPLOAD_MB": "64"}
     log = data / "server.log"
     failed = []
@@ -66,6 +69,7 @@ def main() -> int:
                 ("dropping a clip YouTube would age-restrict", ["tests/test_restricted.py"]),
                 ("when a queued clip goes out", ["tests/test_schedule.py"]),
                 ("crediting whoever made the video a clip came from", ["tests/test_credit.py"]),
+                ("never posting a clip twice when YouTube loses the receipt", ["tests/test_upload_recovery.py"]),
                 ("finding the facecam in a gaming stream", ["tests/test_facecam.py"]),
                 ("fresh installs: ffmpeg, the speech model, AI errors", ["tests/test_tools.py"]),
                 ("the storage folder: full drive, open, move", ["tests/test_storage.py"]),

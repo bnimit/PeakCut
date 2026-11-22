@@ -11,6 +11,9 @@ Nothing here goes out to the internet and nothing is posted: only the times are 
 Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile, time
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-schedule-")
+# The checks below are written in this machine's own clock, so they must not pick up a viewers' timezone out of
+# whoever's .env this is running on. The viewers'-timezone checks at the bottom set the zone themselves.
+os.environ.update(PEAKCUT_POST_TZ="", PEAKCUT_POST_START="9", PEAKCUT_POST_END="22")
 sys.path.insert(0, ".")
 from studio import posting
 fails = []

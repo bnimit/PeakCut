@@ -353,10 +353,35 @@ def youtube_upload(acc, path: Path, title: str, description: str, tags: list, pr
                               headers={"Authorization": f"Bearer {token}", "X-Upload-Content-Type": "video/mp4",
                                        "X-Upload-Content-Length": str(size)}, timeout=60), "Starting the YouTube upload")
     with path.open("rb") as f:
-        done = _check(httpx.put(start.headers["Location"], content=f.read(),
+        body = f.read()
+    try:
+        done = _check(httpx.put(start.headers["Location"], content=body,
                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "video/mp4"}, timeout=900),
                       "Uploading to YouTube").json()
+    except Exception:  # noqa: BLE001
+        # The upload did not answer us. That is not the same as the video not being there: YouTube can take the
+        # whole file, publish it, and then lose the reply, which arrives as a 408 or as nothing at all. Asking
+        # before giving up is the only way to tell the two apart, and getting it wrong puts the clip up twice.
+        done = _upload_landed(start.headers["Location"], token, size)
+        if not done:
+            raise
     return done["id"], f"https://www.youtube.com/shorts/{done['id']}"
+
+
+def _upload_landed(session_url: str, token: str, size: int):
+    """Ask YouTube whether an upload we lost the answer to actually arrived, and return the video if it did.
+
+    Every resumable upload has its own address, and YouTube keeps the answer there. Asking for nothing (an empty
+    body, and a range saying "I am only asking") gets either the finished video or how much of it arrived."""
+    try:
+        r = httpx.put(session_url, content=b"",
+                      headers={"Authorization": f"Bearer {token}", "Content-Range": f"bytes */{size}"}, timeout=60)
+    except Exception:  # noqa: BLE001
+        return None                       # we cannot reach YouTube either: treat it as not there and let it retry
+    if r.status_code in (200, 201):
+        got = r.json()
+        return got if got.get("id") else None
+    return None     # 308: part of it arrived, so nothing was published. 404: the upload is gone. Neither posted.
 
 
 def youtube_views(acc, ids: list) -> dict:
