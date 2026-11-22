@@ -171,7 +171,9 @@ def _footer(creator, job) -> str:
 
 
 def _caption(clip, creator, job=None):
-    tags = " ".join("#" + h for h in clip.get("hashtags", []))
+    # A description the person wrote themselves is posted as it is, without the AI's hashtags added to it, and
+    # one that already ends with its hashtags does not get them twice.
+    tags = "" if clip.get("fixed_description") or clip.get("hashtags_in_description") else " ".join("#" + h for h in clip.get("hashtags", []))
     return "\n\n".join(x for x in (clip.get("description", ""), tags, _footer(creator, job)) if x)
 
 
