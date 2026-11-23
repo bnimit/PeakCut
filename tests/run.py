@@ -75,6 +75,7 @@ def main() -> int:
                 ("when a queued clip goes out", ["tests/test_schedule.py"]),
                 ("crediting whoever made the video a clip came from", ["tests/test_credit.py"]),
                 ("never posting a clip twice when YouTube loses the receipt", ["tests/test_upload_recovery.py"]),
+                ("a clip goes up once, whatever fails after it is up", ["tests/test_post_once.py"]),
                 ("one slow upload not holding up the rest", ["tests/test_queue_blocking.py"]),
                 ("YouTube refusing the new-style address, not the server", ["tests/test_ipv6.py"]),
                 ("finding the facecam in a gaming stream", ["tests/test_facecam.py"]),

@@ -5,6 +5,7 @@ platform's own page and come back. For that, whoever runs the server registers o
 (its id and secret), in .env or in the dashboard (Settings, Connected apps, Set up). Those belong to the server,
 never to users."""
 import base64
+import datetime
 import hashlib
 import hmac
 import json
@@ -376,20 +377,71 @@ def youtube_upload(acc, path: Path, title: str, description: str, tags: list, pr
     return done["id"], f"https://www.youtube.com/shorts/{done['id']}"
 
 
+# How many times to ask whether a lost upload arrived, and how long to wait between asking. Asking once was not
+# enough: the thing that loses the answer is usually a bad line, and a bad line swallows the question too. On 22
+# November 2026 a clip went up twice because the single question failed while the video had been live for six
+# minutes. Asking again a few seconds later costs nothing and is the difference between one video and two.
+PROBE_TRIES, PROBE_WAIT = 4, 5.0
+
+
 def _upload_landed(session_url: str, token: str, size: int):
     """Ask YouTube whether an upload we lost the answer to actually arrived, and return the video if it did.
 
     Every resumable upload has its own address, and YouTube keeps the answer there. Asking for nothing (an empty
-    body, and a range saying "I am only asking") gets either the finished video or how much of it arrived."""
+    body, and a range saying "I am only asking") gets either the finished video or how much of it arrived.
+
+    A question that cannot be delivered is not an answer, so it is asked again rather than taken for a no."""
+    for attempt in range(PROBE_TRIES):
+        try:
+            r = httpx.put(session_url, content=b"",
+                          headers={"Authorization": f"Bearer {token}", "Content-Range": f"bytes */{size}"}, timeout=60)
+        except Exception:  # noqa: BLE001
+            if attempt + 1 < PROBE_TRIES:
+                time.sleep(PROBE_WAIT)
+                continue
+            return None               # the line is still down: the caller checks the channel itself before retrying
+        if r.status_code in (200, 201):
+            got = r.json()
+            return got if got.get("id") else None
+        return None   # 308: part of it arrived, so nothing was published. 404: the upload is gone. Neither posted.
+    return None
+
+
+def youtube_already_there(acc, title: str, within_hours: float = 6.0):
+    """The video this clip already became, if an earlier attempt put it up without managing to tell us.
+
+    Asked before trying an upload again, never before the first one. An upload can go all the way through and
+    still look like a failure from here: the answer gets lost, and the question about it can get lost too. When
+    that happens the only place left holding the truth is the channel itself, so look there before sending the
+    same clip a second time. Matching is by the exact title we gave it, within the last few hours.
+
+    Returns (video id, link) or None. Reading the channel costs a couple of units; an upload costs 1600."""
     try:
-        r = httpx.put(session_url, content=b"",
-                      headers={"Authorization": f"Bearer {token}", "Content-Range": f"bytes */{size}"}, timeout=60)
+        head = {"Authorization": f"Bearer {_yt_token(acc)}"}
+        ch = _check(httpx.get("https://www.googleapis.com/youtube/v3/channels",
+                              params={"part": "contentDetails", "mine": "true"}, headers=head, timeout=30),
+                    "Reading the channel").json().get("items", [])
+        if not ch:
+            return None
+        pl = ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        items = _check(httpx.get("https://www.googleapis.com/youtube/v3/playlistItems",
+                                 params={"part": "snippet,contentDetails", "playlistId": pl, "maxResults": 25},
+                                 headers=head, timeout=30), "Reading recent uploads").json().get("items", [])
     except Exception:  # noqa: BLE001
-        return None                       # we cannot reach YouTube either: treat it as not there and let it retry
-    if r.status_code in (200, 201):
-        got = r.json()
-        return got if got.get("id") else None
-    return None     # 308: part of it arrived, so nothing was published. 404: the upload is gone. Neither posted.
+        return None            # cannot look: the caller carries on, because never posting is worse than twice
+    want = re.sub(r"[<>]", "", str(title or ""))[:100]
+    cutoff = time.time() - within_hours * 3600
+    for it in items:
+        sn = it["snippet"]
+        at = sn.get("publishedAt") or it.get("contentDetails", {}).get("videoPublishedAt") or ""
+        try:
+            when = datetime.datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if sn.get("title") == want and when >= cutoff:
+            vid = it["contentDetails"]["videoId"]
+            return vid, f"https://www.youtube.com/shorts/{vid}"
+    return None
 
 
 def youtube_views(acc, ids: list) -> dict:

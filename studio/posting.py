@@ -181,6 +181,7 @@ def _post(p):
     job = jobs.get(p["job"])
     clip = next((c for c in job["clips"] if c["id"] == p["clip"]), None) if job else None
     acc = accounts.get(p["account"])
+    adopted = False          # true when a previous attempt had already put this clip up
     try:
         if not clip or clip.get("status") != "done":
             raise RuntimeError("The clip no longer exists or is not finished.")
@@ -190,15 +191,24 @@ def _post(p):
         creator = creators.get(job["creator"]) or dict(creators.DEFAULTS, name="clips")
         title, cap = clip.get("title") or clip.get("hook") or "Clip", _caption(clip, creator, job)
         if acc["platform"] == "youtube":
-            rid, url = accounts.youtube_upload(acc, path, title, cap + "\n\n#Shorts", clip.get("hashtags", []), creator["privacy"])
+            # An attempt that failed may still have put the video up: the upload can go through and lose the
+            # answer, and the question about it can be lost too. Look on the channel before sending it again.
+            done = accounts.youtube_already_there(acc, title) if p.get("tries") else None
+            # Two clips can end up with the same title. If some other post already claims that video, it is
+            # that post's, not this one's, and this clip still has to go up.
+            if done and any(q["remote_id"] == done[0] for q in _posts if q is not p and q.get("remote_id")):
+                done = None
+            if done:
+                rid, url = done
+                adopted = True
+            else:
+                rid, url = accounts.youtube_upload(acc, path, title, cap + "\n\n#Shorts", clip.get("hashtags", []), creator["privacy"])
         elif acc["platform"] == "instagram":
             rid, url = accounts.instagram_upload(acc, path, f"{title}\n\n{cap}", job["id"])
         elif acc["platform"] == "tiktok":
             rid, url = accounts.tiktok_upload(acc, path, f"{title}\n\n{cap}", creator["privacy"])
         else:
             raise RuntimeError("That kind of account is no longer supported.")
-        p.update(status="posted", posted_at=time.time(), remote_id=rid, url=url, error=None)
-        creators.log(p["creator"], f"Posted to {acc['name']}: {title}")
     except Exception as e:  # noqa: BLE001
         p["tries"] += 1
         p["error"] = str(e)[-300:]
@@ -208,6 +218,16 @@ def _post(p):
             p["status"] = "failed"
             creators.log(p["creator"], f"Post failed on {p['account_name']}: {p['error']}")
             alerts.notify(f"post failed on {p['account_name']} ({p['title']}): {p['error'][:200]}", kind="post")
+    else:
+        # Marked posted only once the video is really up, and outside the try on purpose: anything that goes
+        # wrong from here on (writing the log, saving) must never send the clip a second time. It used to be
+        # inside, so a failure after a good upload put the queue back to "waiting" and the clip went up twice.
+        p.update(status="posted", posted_at=time.time(), remote_id=rid, url=url, error=None)
+        try:
+            creators.log(p["creator"], (f"Already on {acc['name']} from the last try, not sent again: {title}"
+                                        if adopted else f"Posted to {acc['name']}: {title}"))
+        except Exception:  # noqa: BLE001
+            pass                      # the video is up; a log line is not worth risking a second copy over
     _save()
     _mirror(p)
 
