@@ -36,6 +36,35 @@ check("every tag is plain letters and digits", all(t.isalnum() and t == t.lower(
 check("a channel name loses its Live and Official", (h.channel_tag("Kai Cenat Live"), h.channel_tag("Pewdiepie Official")) == ("kaicenat", "pewdiepie"))
 check("at most five even with many to choose from", len(h.make(SAID, TITLE, "Kai Cenat", "GTA 6", "funny", ["a1b", "c2d", "e3f", "g4h", "i5j", "k6l"])) == 5)
 
+# ---- a possessive is not a word of its own
+#
+# "Joey's" was being kept whole and then stripped of its apostrophe at the last moment, so real posts went out
+# wearing #joeys, #lucias and #jasons next to #joey. It is the same name twice, and the second spelling is one
+# nobody searches for. Seen on 23 November 2026 on a clip cut from a GTA 6 guide.
+POSS = "You can hide cash at Joey's place. Joey's garage is safe, and Joey will keep it for you."
+poss = h.make(POSS, "Where to hide cash in GTA 6", "", "GTA 6")
+check("a possessive is not a tag of its own", not {"joeys", "lucias", "jasons"} & set(poss), str(poss))
+check("the name itself is what gets used", "joey" in poss, str(poss))
+
+# ---- the game's own tags are the ones worth searching for
+#
+# Cutting the game down to a single tag to stop #GTA6 dragging #GTA6Game along also threw away #ViceCity and
+# #RockstarGames, which are not look-alikes at all, and the freed room went to words scraped out of the speech.
+g = h.make("", "Some GTA 6 clip", "", "GTA 6")
+check("the game's distinct tags are used, not only the first", {"vicecity", "rockstargames"} <= set(g), str(g))
+check("but a near-copy of a tag already there is left out", "gta6launch" not in g and "gta6game" not in g, str(g))
+check("the game still comes first", g[0] == "gta6", str(g))
+
+# "the Better way", "the Fastest car": a comparison is not a thing anyone searches for by itself
+cmp_tags = h.make("The Better route. Better every time, and the Fastest one is Better still.",
+                  "A better faster clip", "", "GTA 6")
+check("a comparison word is not a tag", not {"better", "fastest"} & set(cmp_tags), str(cmp_tags))
+
+# with a channel and speech to go on, the game still gets its room and the junk stays out
+mix = h.make(POSS, "Where to hide cash in GTA 6", "MrDalekJD", "GTA 6")
+check("a clip from someone else's video is not mostly their name and possessives",
+      "vicecity" in mix and not {"joeys", "lucias"} & set(mix), str(mix))
+
 NL = chr(10)
 words = [{"w": w, "s": 10 + i, "e": 10.5 + i} for i, w in enumerate(SAID.split())]
 clip = {"start": 10, "end": 40, "category": "fail", "description": "Kai gets stuck up #gta", "hashtags": ["GTA6"]}

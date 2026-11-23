@@ -28,6 +28,7 @@ well went were what when where whether which while who whole why will with witho
 hai kya yaar nahi nahin bhai toh aur mein tha kar karo kiya ho hain bhi koi abhi main mera tera apna isko usko jab tab phir
 woh wo ye yeh hum tum aap kuch sab bohot bahut matlab accha acha theek lekin par kyun kaise
 actual actually literally basically honestly probably definitely obviously seriously totally bro dude man chat stream video
+better best worse worst bigger biggest smaller easier easiest faster fastest harder hardest cheaper cheapest stronger
 fuck fucking fucked shit damn bitch bitches ass dick pussy sex nigga nigger niggas porn rape
 """.split())
 
@@ -74,11 +75,14 @@ def keywords(text, title="", count=2) -> list:
         if not m:
             continue
         got = m.group(0)
-        # "you'll" is not the word "youll": take what comes before the apostrophe and judge that, or the
-        # contractions of ordinary words sail past the stop list in a shape it does not list.
-        if "'" in got and got.split("'")[0].lower() in STOP:
+        # "you'll" is not the word "youll", and "Joey's" is not a word at all: it is the name Joey. So take
+        # what comes before the apostrophe and judge that. Keeping the whole thing let contractions sail past
+        # the stop list in a shape it does not list, and sent the same name out twice, the second time spelled
+        # the way nobody searches for it (#joey next to #joeys, #lucia next to #lucias).
+        base = got.split("'")[0]
+        if base.lower() in STOP:
             continue
-        w = got.strip("'").lower()
+        w = base.lower()
         if w in STOP or len(w) < 4 or not _tag(w):
             continue
         name = r[:1].isupper() and i > 0 and raw[i - 1][-1:] not in ".?!"
@@ -117,6 +121,14 @@ def make(text="", title="", uploader="", game=None, category="other", ai_tags=()
     for t in numbered(title)[:1]:
         add(t)
     add(CATEGORY_TAGS.get(str(category or "").lower(), ""))
+    # Whatever room is left goes to the game's other tags before it goes to #shorts and #clips. Only the main
+    # one is taken above, because #GTA6Game and #GTA6Launch say nothing #GTA6 has not already said; but
+    # #ViceCity and #RockstarGames are their own words and people search them, and they were being thrown out
+    # with the look-alikes. Anything that merely spells a tag already here differently is still left out.
+    for t in games.tags_of(game):
+        tt = _tag(t)
+        if tt and not any(tt in g or g in tt for g in out):
+            add(t)
     for t in FILLER:
         if len(out) < LEAST:
             add(t)
