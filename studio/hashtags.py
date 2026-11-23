@@ -110,11 +110,20 @@ def make(text="", title="", uploader="", game=None, category="other", ai_tags=()
         t = _tag(t)
         return bool(t) and not any(t != g and t in g for g in inside_game_tag)
 
+    def fresh(t):
+        """Not another spelling of a tag already picked: #GTA6Game says nothing #GTA6 has not said."""
+        t = _tag(t)
+        return bool(t) and not any(t in g or g in t for g in out)
+
     for t in games.tags_of(game)[:1]:       # the game's main tag; its look-alikes would only use up the room
         add(t)
     add(channel_tag(uploader))
+    # The AI writes its own tags, and it likes writing the game's name a second way: #GTA6Game next to #GTA6.
+    # Those were going straight in, because only the tags we pick ourselves were being checked for look-alikes.
+    # Every clip of a fresh GTA 6 job went out with #gta6game sitting in a slot that said nothing new.
     for t in list(ai_tags or [])[:2]:
-        add(t)
+        if fresh(t):
+            add(t)
     for t in keywords(text, title):
         if spare(t):
             add(t)
@@ -126,8 +135,7 @@ def make(text="", title="", uploader="", game=None, category="other", ai_tags=()
     # #ViceCity and #RockstarGames are their own words and people search them, and they were being thrown out
     # with the look-alikes. Anything that merely spells a tag already here differently is still left out.
     for t in games.tags_of(game):
-        tt = _tag(t)
-        if tt and not any(tt in g or g in tt for g in out):
+        if fresh(t):
             add(t)
     for t in FILLER:
         if len(out) < LEAST:

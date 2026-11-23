@@ -65,6 +65,17 @@ mix = h.make(POSS, "Where to hide cash in GTA 6", "MrDalekJD", "GTA 6")
 check("a clip from someone else's video is not mostly their name and possessives",
       "vicecity" in mix and not {"joeys", "lucias"} & set(mix), str(mix))
 
+# ---- the AI's own tags get the same look-alike check as ours
+#
+# Only the tags picked here were being checked against each other, so when the AI wrote "GTA6Game" itself it
+# went straight in next to #GTA6. Every clip of a GTA 6 job cut on 23 November 2026 went out that way, with a
+# slot spent on a second spelling of the game.
+ai = h.make("", "Some GTA 6 clip", "MrDalekJD", "GTA 6", "other", ["GTA6Game", "GTA6"])
+check("a tag the AI spelled the game's name a second way is left out", "gta6game" not in ai, str(ai))
+check("and the room goes to a tag that says something new", {"vicecity", "rockstargames"} & set(ai), str(ai))
+check("the AI's genuinely different tag is still used",
+      "slimjim" in h.make("", "Some GTA 6 clip", "", "GTA 6", "other", ["SlimJim"]), str(ai))
+
 NL = chr(10)
 words = [{"w": w, "s": 10 + i, "e": 10.5 + i} for i, w in enumerate(SAID.split())]
 clip = {"start": 10, "end": 40, "category": "fail", "description": "Kai gets stuck up #gta", "hashtags": ["GTA6"]}
