@@ -326,12 +326,31 @@ def fallback_by_loudness(db, words, n, max_len, duration):
 SEARCHED_FOR = """- Worth most of all: a moment that answers something a player would type into a search box. For this game
   people look up {what}. A clip that shows one of those being done beats a louder moment that answers
   nothing, so pick it when it is there, and write the title as the answer, not as a tease.
-"""
+{stuck}"""
 
 SEARCHED_GENERAL = """- Worth most of all: a moment that answers something a player would type into a search box: how to get
-  something, where to find something, or what a particular named thing in the game does. A clip like that
+  something, where to find something, or how to get out of something that has gone wrong. A clip like that
   beats a louder moment that answers nothing, so pick it when it is there, and write the title as the
   answer, not as a tease.
+{stuck}"""
+
+# Which of those searches to reach for first, and it is not the one we had been reaching for. Five clips from
+# one video went up in the same minute on 20 November 2026. Two of them took 127 views between them: "How to
+# Get Your Loot Back After a GTA 6 Robbery" and "The One GTA 6 Vehicle You Can't Register". The other three
+# explained a system instead ("All 5 Levels Explained", "The Perks and the Catch", "Won't Let You Carry Guns
+# in Public") and have never been watched by anyone. Same minute, same video, same channel, so it was not the
+# posting time or luck of the slot: it was what the clip was about. The two that worked are both a player
+# stuck or out of pocket and the way back out. The rule above had been asking for "what a particular named
+# thing does", which is precisely what the three dead ones were.
+STUCK = """- Best of those by far: the player is stuck, has lost something, or has hit a wall, and the clip shows the
+  way out. "How to get your loot back after a robbery" or "the one vehicle you cannot register" is worth
+  more than "all five levels explained" or "what the perks are", even when the second kind is clearer and
+  louder. Something has gone wrong for the player and the clip undoes it: that is the clip to pick.
+- Explaining a system, listing its levels or tiers, or saying what a thing is for is not worth clipping on
+  its own, however well it is explained. It is worth clipping only when someone who hit that thing and could
+  not get past it would go looking for it.
+- Write the title the way the stuck player would say the problem ("where your cash goes when you die"),
+  never as the name of a system ("the criminal profile levels explained").
 """
 
 
@@ -341,7 +360,8 @@ def _game_rules(game):
         return ""
     tags = ", ".join(games.tags_of(game)) or "the game's own tags"
     what = games.looked_up(game)
-    searches = (SEARCHED_FOR.format(what="; ".join(what)) if what else SEARCHED_GENERAL).rstrip()
+    searches = (SEARCHED_FOR.format(what="; ".join(what), stuck=STUCK) if what
+                else SEARCHED_GENERAL.format(stuck=STUCK)).rstrip()
     # The creator types the game in themselves, so it is treated like any other text from outside.
     return GAME_RULES.format(game=_safe(games.name_of(game) or str(game), 40), tags=tags, searches=searches)
 

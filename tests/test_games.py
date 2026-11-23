@@ -172,5 +172,29 @@ check("the game rules name it", "Gears of War: E-Day" in rules, True)
 check("the rules carry its real terms, not the general wording",
       "wall bounce" in rules and "nobody asked about" not in rules, True)
 
+
+# ---- which search to reach for first: the stuck player, not the system explained
+#
+# Five clips from one video went up in the same minute on 20 November 2026. The two about a player stuck or
+# out of pocket took 127 views between them; the three that explained a system have never been watched. The
+# rule used to ask for "what a particular named thing does", which was the shape of all three dead ones.
+for g in ("gta 6", "World of Warcraft", "Gears of War: E-Day", "Elden Ring"):
+    r = brain._game_rules(g)
+    check(f"{g}: the stuck player is ranked first", "has hit a wall" in r, True)
+    check(f"{g}: explaining a system is called out as not enough", "not worth clipping on" in r, True)
+    check(f"{g}: the title is to be written the stuck player's way", "where your cash goes when you die" in r, True)
+
+gta = brain._game_rules("gta 6")
+# The general rule is where this wording lived, so that is where it has to be gone from.
+check("the wording that endorsed the dead clips is gone from the general rule",
+      "what a particular named thing in the game does" not in brain._game_rules("Elden Ring"), True)
+check("a game with its own searches still gets them as well as the ranking",
+      "how to make money" in gta and "has hit a wall" in gta, True)
+check("the general rule also gets the ranking", "has hit a wall" in brain._game_rules("Elden Ring"), True)
+check("the ranking is not pasted in twice", gta.count("has hit a wall"), 1)
+check("the added rules leave no empty gap", "\n\n-" in gta, False)
+check("no placeholder is left unfilled in any game's rules",
+      [g for g in ("gta 6", "Elden Ring", "World of Warcraft") if "{" in brain._game_rules(g)], [])
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)
