@@ -26,6 +26,12 @@ HOOK = {"font": "Poppins ExtraBold", "size": 96, "ink": "14100E", "box": "FFFFFF
         # a moment to notice it, a quarter of a second a word, never more than five seconds, and never
         # more than the first part of the clip.
         "hold": 1.2, "per_word": 0.26, "max_hold": 5.0, "share": 0.5, "fade_out": 260}
+# The closing line, in the same white box as the heading, in the last seconds of the clip. People watch
+# these clips through - 87 out of every 100 of a clip's length, and some of them twice - and then leave,
+# because nothing on the screen ever says who made it or what the next one would be. So this is the ask.
+# It is empty unless somebody fills it in: a clip that asks for nothing is better than one that asks
+# for something nobody chose to say.
+END = {"hold": 2.2, "min_hold": 1.0, "gap": 0.6, "fade_in": 220}
 FONT_FILES = {"Poppins ExtraBold": "Poppins-ExtraBold.ttf", "Anton": "Anton-Regular.ttf", "Archivo Black": "ArchivoBlack-Regular.ttf"}
 CAP_MAX_W = 960   # captions never run wider than this, whatever is said
 
@@ -151,10 +157,28 @@ def hook_hold(hook, dur):
     return round(read, 2)
 
 
-def _hook_events(hook, dur, y):
-    """The heading: dark text in a white rounded box that fits it, on one line or two balanced ones."""
+def end_card_span(text, dur, hook=""):
+    """When the closing line comes up and when the clip ends, or nothing when there is no line to show.
+
+    It sits in the last couple of seconds, after the moment has landed, and it waits for the heading to
+    have left with a clear moment in between: the two share the same box, so they must never run into
+    each other. A clip too short to give it that is left alone - a clip that has only just finished
+    saying its heading has no room to ask for anything.
+    """
+    if not str(text or "").strip() or dur <= 0:
+        return None
+    start = max(dur - END["hold"], hook_hold(hook, dur) + END["gap"])
+    return (round(start, 2), round(dur, 2)) if dur - start >= END["min_hold"] else None
+
+
+def _banner(text, y, t0, t1, fade_in, fade_out):
+    """One line of dark text in a white rounded box that fits it, on one line or two balanced ones.
+
+    The heading at the start and the closing line at the end are the same thing in the same place: the
+    heading has gone by the time the closing line arrives, so they share the spot and the drawing.
+    """
     f, size = _Font.get(HOOK["font"]), HOOK["size"]
-    words = hook.split()
+    words = str(text or "").split()
     if not words:
         return []
     lines = [" ".join(words)]
@@ -174,8 +198,8 @@ def _hook_events(hook, dur, y):
            f"l {n(x1)} {n(y1 - r)} b {n(x1)} {n(y1)} {n(x1)} {n(y1)} {n(x1 - r)} {n(y1)} "
            f"l {n(x0 + r)} {n(y1)} b {n(x0)} {n(y1)} {n(x0)} {n(y1)} {n(x0)} {n(y1 - r)} "
            f"l {n(x0)} {n(y0 + r)} b {n(x0)} {n(y0)} {n(x0)} {n(y0)} {n(x0 + r)} {n(y0)}")
-    span = f"{_ts(0)},{_ts(hook_hold(hook, dur))}"
-    fade = f"\\fad(160,{HOOK['fade_out']})"
+    span = f"{_ts(t0)},{_ts(t1)}"
+    fade = f"\\fad({fade_in},{fade_out})"
     ev = [f"Dialogue: 3,{span},Hook,,0,0,0,,{{\\an7\\pos(0,0){fade}\\c&H{HOOK['box']}&\\p1}}{box}{{\\p0}}"]
     for i, line in enumerate(lines):
         cy = y - line_h * (len(lines) - 1) / 2 + i * line_h - f.cap_shift(size)
@@ -183,7 +207,16 @@ def _hook_events(hook, dur, y):
     return ev
 
 
-def build_ass(words, start, end, hook, style_name, highlight, hook_y, cap_y) -> str:
+def _hook_events(hook, dur, y, end_card=""):
+    """The heading at the start, and the closing line at the end when there is one."""
+    ev = _banner(hook, y, 0, hook_hold(hook, dur), 160, HOOK["fade_out"])
+    span = end_card_span(end_card, dur, hook)
+    if span:
+        ev += _banner(end_card, y, span[0], span[1], END["fade_in"], 0)
+    return ev
+
+
+def build_ass(words, start, end, hook, style_name, highlight, hook_y, cap_y, end_card="") -> str:
     st = STYLES.get(style_name, STYLES["bounce"])
     words = [dict(w, s=w["s"] - CAPTION_LEAD, e=w["e"] - CAPTION_LEAD) for w in words]
     strong = {_key(h) for h in highlight if _key(h)}
@@ -203,7 +236,7 @@ Style: Hook,{HOOK['font']},{HOOK['size']},&H00{HOOK['ink']},&H00{HOOK['ink']},&H
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     dur = end - start
-    ev = _hook_events(_clean(hook), dur, hook_y)
+    ev = _hook_events(_clean(hook), dur, hook_y, _clean(end_card))
     f = _Font.get(st["font"])
     inside = [dict(w, w=_clean(w["w"])) for w in words if w["s"] >= start - 0.05 and w["s"] < end]
     inside = sorted((w for w in inside if w["w"]), key=lambda w: w["s"])
@@ -312,7 +345,7 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
         layout = "crop"     # no webcam found: the game fills the screen, which is still the right shape
     hook_y = _hook_y(layout, hook_y, face)
     ass = build_ass(words if clip.get("captions", True) else [], start, end, clip.get("hook", ""), clip.get("style", "bounce"),
-                    clip.get("highlight_words", []), hook_y, cap_y)
+                    clip.get("highlight_words", []), hook_y, cap_y, clip.get("end_card", ""))
     # The clip is made in a short work folder and moved into place afterwards. The caption step of ffmpeg cannot
     # open files whose full path is longer than 260 characters on Windows, which a data folder deep inside other
     # folders easily reaches. Inside the work folder every name is short and relative (a drive colon would also

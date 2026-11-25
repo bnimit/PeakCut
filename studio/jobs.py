@@ -110,6 +110,7 @@ on_clip_ready: list = []   # callbacks (job, clip), run once when a clip first f
 
 DEFAULTS = {"max_clips": 6, "min_len": 15, "max_len": 60, "style": "bounce", "layout": "blur", "quality": 720,
             "range_start": None, "range_end": None, "captions": True, "hook_text": "", "description_text": "",
+            "end_card": "",
             "lang": "en"}   # lang: the language spoken
 
 
@@ -125,8 +126,8 @@ def clean_options(options) -> dict:
                 raise ValueError("Captions must be on or off.")
             out[k] = v
             continue
-        if k in ("hook_text", "description_text"):     # kept even when empty: it clears the creator's own text for this video
-            out[k] = creators.clean_hook(v) if k == "hook_text" else creators.clean_description(v)
+        if k in ("hook_text", "end_card", "description_text"):   # kept even when empty: it clears the creator's own text for this video
+            out[k] = creators.clean_description(v) if k == "description_text" else creators.clean_hook(v)
             continue
         if k not in DEFAULTS or v in ("", None):
             continue
@@ -317,6 +318,7 @@ def create(source: dict, options: dict, enqueue=True, creator=None, kind="video"
         d = creators.root(c["id"]) / ("live" if kind == "live" else "videos") / jid
         base = {**DEFAULTS, **{k: c[k] for k in ("max_clips", "min_len", "max_len", "style", "layout", "captions", "lang") if k in c},
                 "hook_text": creators.clean_hook(c.get("hook_text")),
+                "end_card": creators.clean_hook(c.get("end_card")),
                 "description_text": creators.clean_description(c.get("description_text"))}
     else:
         d, base, creator = config.user_dir(ctx.uid()) / "jobs" / jid, dict(DEFAULTS), None
@@ -387,9 +389,9 @@ def request_render(jid, cid, changes: dict):
         raise ValueError("Those times aren't valid.")
     if not 3 <= new["end"] - new["start"] <= 180:
         raise ValueError("A clip can be 3 to 180 seconds long.")
-    for k in ("hook", "title", "description", "style", "layout"):
+    for k in ("hook", "end_card", "title", "description", "style", "layout"):
         if k in changes:
-            new[k] = str(changes[k])[:{"hook": 60, "title": 100, "description": 2000}.get(k, 20)]
+            new[k] = str(changes[k])[:{"hook": 60, "end_card": 60, "title": 100, "description": 2000}.get(k, 20)]
     if "hashtags" in changes:
         new["hashtags"] = clean_hashtags(changes["hashtags"])
     if new.get("style") not in render.STYLES:
@@ -860,6 +862,8 @@ def _run_job(job):
                      captions=o.get("captions", True), status="queued", version=0)
             if o.get("hook_text"):        # the person's own big text, on every clip, in place of the AI's
                 c["hook"] = o["hook_text"]
+            if o.get("end_card"):         # ...and their closing line at the end of every clip
+                c["end_card"] = o["end_card"]
             if o.get("description_text"):  # ...and their own description, exactly as written
                 c["description"], c["fixed_description"] = o["description_text"], True
             else:                          # no description of their own: 3 to 5 fitting hashtags go at the end of the AI's

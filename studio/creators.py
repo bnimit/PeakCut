@@ -18,6 +18,9 @@ DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "cap
             "max_clips": 6, "min_score": 80, "auto_watch": False, "buffer_min": 20, "live_per_hour": 4, "ai_every_min": 3, "ai_only_on_spike": True, "auto_jump_pct": 60,
             "plan": "free", "decide_mode": "both", "must_clip_min": 0, "min_gap_min": 2,
             "game": "", "hook_text": "", "description_text": "",
+            # The line in the last couple of seconds of every clip: the channel's name, what the next clip
+            # would be, whatever you want asked for. Empty means no line and nothing added to the picture.
+            "end_card": "",
             "trigger_words": "clip that, clip it",
             # 150 minutes apart and six a day fills a waking day: 9:00, 11:30, 14:00, 16:30, 19:00, 21:30. At the
             # old 45 minutes the whole day's posts went out before lunch and then nothing for twenty hours, so
@@ -97,7 +100,7 @@ def _clean(data: dict) -> dict:
             v = {p: str(u).strip()[:300] for p, u in (v.items() if isinstance(v, dict) else []) if p in PLATFORMS and str(u).strip()}
         elif k == "accounts":
             v = [str(x) for x in v][:20] if isinstance(v, list) else []
-        elif k == "hook_text":
+        elif k in ("hook_text", "end_card"):
             v = clean_hook(v)
         elif k == "description_text":
             v = clean_description(v)
