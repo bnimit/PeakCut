@@ -94,13 +94,23 @@ Never put links, @handles, phone numbers, or "visit / buy / subscribe" calls in 
 # The examples below are deliberately not any of those real clips: asked with the real pairs in front of it,
 # the AI copied them back word for word instead of learning the shape, and on one clip it dropped a $4,000
 # for a vague question. So the examples teach the shape and the clip has to supply its own words.
-HOOK_RULE = """- The hook is the question the clip answers, never the answer. Showing the answer is the clip's one
-  job, so a hook that has already given it away leaves nobody a reason to keep watching. Name the problem,
-  the thing, or what is at stake, and stop there.
+# Asking for "the question the clip answers" then had the AI ending nine hooks in ten with a question mark.
+# One at a time that reads fine; a channel page of them reads like one sentence over and over. Holding the
+# answer back is the point and a question is only one way to do it, so the shapes are now listed and the
+# question is one of five. Each clip is written on its own, so nothing here can count the others: the list
+# makes a question less likely per clip rather than rationing them across a batch.
+HOOK_RULE = """- The hook sets up what the clip pays off, and never pays it off itself. Showing the answer is the
+  clip's one job, so a hook that has already given it away leaves nobody a reason to keep watching. Name the
+  problem, the thing, or what is at stake, and stop there.
 - Handing the outcome over is the usual mistake, so check for it before you settle. "THE BRIDGE COLLAPSES"
   tells a viewer the one thing they would have stayed for; "WHY THIS BRIDGE?" is the same clip and does not.
   Ask whether someone who read the hook would still need to watch it. If not, write it again.
-- Keep whatever is concrete. A number, a price or a named thing beats a tidy question with nothing in it:
+- A question is one way to hold the answer back, not the way, and it is the one everybody reaches for first.
+  These all hold it back just as well, so pick the one that suits the clip: the moment before it happens
+  ("BEFORE YOU CROSS THIS BRIDGE"), the thing named flatly ("THE BRIDGE NOBODY CHECKS"), a warning
+  ("DON'T CROSS HERE"), the problem stated straight ("THIS BRIDGE KEEPS KILLING PEOPLE"), or a question
+  ("WHY THIS BRIDGE?"). Reach for a question only when it beats all four, not out of habit.
+- Keep whatever is concrete. A number, a price or a named thing beats a tidy phrase with nothing in it:
   "THE SAFE BEHIND THE BAR" is better than "FREE MONEY SOMEWHERE", and "FLIPPED YOUR CAR? DO THIS" is
   better than "A DRIVING PROBLEM". Leave the number out only when the number is itself the payoff."""
 

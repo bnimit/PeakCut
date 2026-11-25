@@ -200,12 +200,14 @@ check("no placeholder is left unfilled in any game's rules",
 # Every video gets this rule, whether or not we know the game, so it has to be in the plain rules.
 plain = brain._rules(15, 60, "nothing was said")
 for name, r in (("the plain rules", plain), ("a game's rules and the plain rules", gta + plain)):
-    check(f"{name}: the hook is asked for as the question, not the answer",
-          "the question the clip answers, never the answer" in r, True)
+    check(f"{name}: the hook is asked to set the payoff up, not give it away",
+          "never pays it off itself" in r, True)
     check(f"{name}: giving the ending away is named as the mistake", "Handing the outcome over" in r, True)
     check(f"{name}: a concrete number is asked to be kept", "Keep whatever is concrete" in r, True)
+    check(f"{name}: a question is asked for as one shape among several",
+          "A question is one way to hold the answer back, not the way" in r, True)
 check("the hook rule is not pasted in twice when the game is known",
-      (gta + plain).count("the question the clip answers"), 1)
+      (gta + plain).count("never pays it off itself"), 1)
 check("the example that was the whole payoff is gone", "HE FOUND BIGFOOT" in gta + plain, False)
 check("the old wording that asked for the mistake is gone", "Curiosity, but true to what happens" in plain, False)
 check("the five word limit is still stated", "at most 5 words" in plain, True)
@@ -224,6 +226,15 @@ check("no example is lifted from a clip of ours",
       [e for e in shouty if e in ("THE BANK CASH EXPLODES", "PLANE CRASHES, FREE $1,000",
                                   "YOU LOSE THE GUN FOREVER", "$4,000 FROM ONE DIVE",
                                   "WHY BANK CASH EXPLODES", "WHAT THE PLANE CRASH LEAVES")], [])
+
+# The rule used to ask for "the question the clip answers" and got a question mark on nine hooks in ten.
+# A rule whose own examples are nearly all questions would teach that back, whatever the words around them say.
+asking = [e for e in shouty if e.rstrip().endswith("?")]
+check("the examples are mostly not questions", len(asking) * 2 <= len(shouty), True)
+check("the examples show the other shapes a hook can take",
+      all(any(e.startswith(w) for e in shouty) for w in ("BEFORE ", "DON'T ", "THE ")), True)
+check("a good hook that is not a question is shown as good",
+      "THE BRIDGE NOBODY CHECKS" in brain.HOOK_RULE, True)
 
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)
