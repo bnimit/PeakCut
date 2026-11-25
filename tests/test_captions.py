@@ -101,6 +101,27 @@ def main(data):
             ass = encode.call_args.args[-1]
             check("the renderer honors captions off even when it receives spoken words",
                   not has_dialogue(ass, "Cap") and has_dialogue(ass, "Hook", "KEEP THE HOOK"))
+
+            # The heading used to be pinned on screen for the clip's whole length, so a white slab covered the
+            # video all the way through. It is up long enough to read and then it goes.
+            hook = "How to get your loot back"
+            check("the heading goes away well before a long clip ends",
+                  0 < render.hook_hold(hook, 42.0) <= 4.0)
+            check("a longer heading is given longer to be read",
+                  render.hook_hold("one two three four five six seven eight", 42.0) > render.hook_hold("short one", 42.0))
+            check("no heading outstays five seconds, however many words it has",
+                  render.hook_hold(" ".join(["word"] * 60), 42.0) <= 5.0)
+            check("on a short clip the heading takes at most half of it",
+                  render.hook_hold(hook, 4.0) <= 2.0 and render.hook_hold(hook, 4.0) > 0)
+            check("even a very short clip shows its heading", render.hook_hold(hook, 1.2) >= 1.0)
+            check("a clip of unknown length still gets a readable heading", render.hook_hold(hook, 0) >= 1.0)
+
+            ass = render.build_ass(WORDS, 0.0, 42.0, hook, "bounce", [], 300, 1380)
+            heading = [x for x in ass.splitlines() if x.startswith("Dialogue: ") and ",Hook," in x]
+            check("the heading is drawn and its box ends with it", len(heading) >= 2)
+            check("the heading's lines do not run to the end of a 42 second clip",
+                  all(",0:00:42" not in x for x in heading) and all("0:00:0" in x.split(",")[2] for x in heading))
+            check("the heading fades out instead of blinking off", all("\\fad(160,260)" in x for x in heading))
     finally:
         db.engine.dispose()
 

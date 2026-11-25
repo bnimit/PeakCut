@@ -20,7 +20,12 @@ STYLES = {
               "strong": "FFFFFF", "outline": 5, "pop": 106, "upper": False, "per": 4},
 }
 HOOK = {"font": "Poppins ExtraBold", "size": 96, "ink": "14100E", "box": "FFFFFF", "pad_x": 36, "pad_y": 22, "radius": 26,
-        "max_w": 900}
+        "max_w": 900,
+        # How long the heading stays up. It used to stay for the whole clip, so a white slab sat over the
+        # video while the interesting part was happening. Now it is up long enough to read and then goes:
+        # a moment to notice it, a quarter of a second a word, never more than five seconds, and never
+        # more than the first part of the clip.
+        "hold": 1.2, "per_word": 0.26, "max_hold": 5.0, "share": 0.5, "fade_out": 260}
 FONT_FILES = {"Poppins ExtraBold": "Poppins-ExtraBold.ttf", "Anton": "Anton-Regular.ttf", "Archivo Black": "ArchivoBlack-Regular.ttf"}
 CAP_MAX_W = 960   # captions never run wider than this, whatever is said
 
@@ -132,6 +137,20 @@ def geometry(src_w, src_h, layout):
     return layout, fg_h, max(230, top - 190), min(1640, top + fg_h + 180)
 
 
+def hook_hold(hook, dur):
+    """How many seconds the heading is on screen, counting from the start of the clip.
+
+    Reading is what sets it: roughly a quarter of a second a word, with a moment on top so that a
+    three word hook is not a flash. Two limits keep it out of the way: five seconds at the very most,
+    and never past the first half of the clip, so a short clip gets a short heading. A clip so short
+    that half of it is under a second gets its first second.
+    """
+    read = min(HOOK["hold"] + HOOK["per_word"] * len(str(hook).split()), HOOK["max_hold"])
+    if dur > 0:
+        read = min(read, max(dur * HOOK["share"], min(dur, 1.0)))
+    return round(read, 2)
+
+
 def _hook_events(hook, dur, y):
     """The heading: dark text in a white rounded box that fits it, on one line or two balanced ones."""
     f, size = _Font.get(HOOK["font"]), HOOK["size"]
@@ -155,11 +174,12 @@ def _hook_events(hook, dur, y):
            f"l {n(x1)} {n(y1 - r)} b {n(x1)} {n(y1)} {n(x1)} {n(y1)} {n(x1 - r)} {n(y1)} "
            f"l {n(x0 + r)} {n(y1)} b {n(x0)} {n(y1)} {n(x0)} {n(y1)} {n(x0)} {n(y1 - r)} "
            f"l {n(x0)} {n(y0 + r)} b {n(x0)} {n(y0)} {n(x0)} {n(y0)} {n(x0 + r)} {n(y0)}")
-    span = f"{_ts(0)},{_ts(dur)}"
-    ev = [f"Dialogue: 3,{span},Hook,,0,0,0,,{{\\an7\\pos(0,0)\\fad(160,0)\\c&H{HOOK['box']}&\\p1}}{box}{{\\p0}}"]
+    span = f"{_ts(0)},{_ts(hook_hold(hook, dur))}"
+    fade = f"\\fad(160,{HOOK['fade_out']})"
+    ev = [f"Dialogue: 3,{span},Hook,,0,0,0,,{{\\an7\\pos(0,0){fade}\\c&H{HOOK['box']}&\\p1}}{box}{{\\p0}}"]
     for i, line in enumerate(lines):
         cy = y - line_h * (len(lines) - 1) / 2 + i * line_h - f.cap_shift(size)
-        ev.append(f"Dialogue: 4,{span},Hook,,0,0,0,,{{\\an5\\pos({W // 2},{cy:.0f})\\fad(160,0)\\fs{size}}}{line}")
+        ev.append(f"Dialogue: 4,{span},Hook,,0,0,0,,{{\\an5\\pos({W // 2},{cy:.0f}){fade}\\fs{size}}}{line}")
     return ev
 
 
