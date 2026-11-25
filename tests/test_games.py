@@ -2,7 +2,7 @@
 post carries.
 
 Runs against the code directly, with its own empty data folder."""
-import os, sys, tempfile
+import os, re, sys, tempfile
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
 sys.path.insert(0, ".")
 from studio import brain, games, live
@@ -195,6 +195,35 @@ check("the ranking is not pasted in twice", gta.count("has hit a wall"), 1)
 check("the added rules leave no empty gap", "\n\n-" in gta, False)
 check("no placeholder is left unfilled in any game's rules",
       [g for g in ("gta 6", "Elden Ring", "World of Warcraft") if "{" in brain._game_rules(g)], [])
+
+# The big text at the top of the clip was handing over the payoff, so there was nothing left to watch for.
+# Every video gets this rule, whether or not we know the game, so it has to be in the plain rules.
+plain = brain._rules(15, 60, "nothing was said")
+for name, r in (("the plain rules", plain), ("a game's rules and the plain rules", gta + plain)):
+    check(f"{name}: the hook is asked for as the question, not the answer",
+          "the question the clip answers, never the answer" in r, True)
+    check(f"{name}: giving the ending away is named as the mistake", "Handing the outcome over" in r, True)
+    check(f"{name}: a concrete number is asked to be kept", "Keep whatever is concrete" in r, True)
+check("the hook rule is not pasted in twice when the game is known",
+      (gta + plain).count("the question the clip answers"), 1)
+check("the example that was the whole payoff is gone", "HE FOUND BIGFOOT" in gta + plain, False)
+check("the old wording that asked for the mistake is gone", "Curiosity, but true to what happens" in plain, False)
+check("the five word limit is still stated", "at most 5 words" in plain, True)
+check("no placeholder is left unfilled in the plain rules, at any clip length",
+      [n for n in (0, 15) if "{" in brain._rules(n, n + 60, "x")], [])
+
+# A rule that shows a six word hook is teaching the AI to break the five word limit two lines above it.
+examples = re.findall(r'"([^"]+)"', brain.HOOK_RULE)
+shouty = [e for e in examples if e.upper() == e and any(c.isalpha() for c in e)]
+check("the rule shows some example hooks", len(shouty) >= 6, True)
+check("every example hook obeys the five word limit the rules set",
+      [e for e in shouty if len(e.split()) > 5], [])
+# Given the real hooks as examples, the AI handed them straight back instead of learning the shape, so the
+# examples must not be any clip we have actually posted.
+check("no example is lifted from a clip of ours",
+      [e for e in shouty if e in ("THE BANK CASH EXPLODES", "PLANE CRASHES, FREE $1,000",
+                                  "YOU LOSE THE GUN FOREVER", "$4,000 FROM ONE DIVE",
+                                  "WHY BANK CASH EXPLODES", "WHAT THE PLANE CRASH LEAVES")], [])
 
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)

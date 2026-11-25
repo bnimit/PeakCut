@@ -64,7 +64,8 @@ Rules:
   is thrown away, so mark it true whenever you are not sure the clip would be safe to post.
 - Skip weak moments. Fewer strong clips beat many weak ones. Return [] if nothing is worth clipping.
 - score: 0-100, how likely a stranger keeps watching. Be honest; most clips are 50-80.
-- hook: at most 5 words, ALL CAPS, shown as big text on the video. Curiosity, but true to what happens.
+- hook: at most 5 words, ALL CAPS, shown as big text over the start of the video.
+{hook}
 - title: at most 70 characters, for the post.
 - description: one or two sentences.
 - hashtags: 5 tags without the # sign.
@@ -85,6 +86,25 @@ Never put links, @handles, phone numbers, or "visit / buy / subscribe" calls in 
 """
 
 
+# The big text at the top of a clip was giving the clip away. "THE BANK CASH EXPLODES", "PLANE CRASHES,
+# FREE $1,000", "YOU LOSE THE GUN FOREVER": every one of those tells a viewer the thing they would have
+# stayed to see, in the first second, before the clip has shown them anything. The old rule asked for
+# "curiosity, but true to what happens", and then handed over "HE FOUND BIGFOOT" as an example of a good
+# one, which is the whole payoff in three words. So the prompt was asking for the mistake.
+# The examples below are deliberately not any of those real clips: asked with the real pairs in front of it,
+# the AI copied them back word for word instead of learning the shape, and on one clip it dropped a $4,000
+# for a vague question. So the examples teach the shape and the clip has to supply its own words.
+HOOK_RULE = """- The hook is the question the clip answers, never the answer. Showing the answer is the clip's one
+  job, so a hook that has already given it away leaves nobody a reason to keep watching. Name the problem,
+  the thing, or what is at stake, and stop there.
+- Handing the outcome over is the usual mistake, so check for it before you settle. "THE BRIDGE COLLAPSES"
+  tells a viewer the one thing they would have stayed for; "WHY THIS BRIDGE?" is the same clip and does not.
+  Ask whether someone who read the hook would still need to watch it. If not, write it again.
+- Keep whatever is concrete. A number, a price or a named thing beats a tidy question with nothing in it:
+  "THE SAFE BEHIND THE BAR" is better than "FREE MONEY SOMEWHERE", and "FLIPPED YOUR CAR? DO THIS" is
+  better than "A DRIVING PROBLEM". Leave the number out only when the number is itself the payoff."""
+
+
 ARABIC_SCRIPT = re.compile(r"[؀-ۿ]")
 ARABIC_NOTE = ("- The transcript is in Arabic letters. Speakers often mix in English words, which the speech model "
                "writes in Arabic letters (\"سبسكرايب\" is \"subscribe\", \"أوكي\" is \"okay\"): read them as the English "
@@ -94,7 +114,7 @@ ARABIC_NOTE = ("- The transcript is in Arabic letters. Speakers often mix in Eng
 def _rules(min_len, max_len, transcript: str) -> str:
     """The rules and the transcript, with a note about English words in Arabic letters when the speech is in Arabic script."""
     note = ARABIC_NOTE if len(ARABIC_SCRIPT.findall(transcript)) > 40 else ""
-    return RULES.format(min_len=min_len, max_len=max_len, transcript=transcript, language=note)
+    return RULES.format(min_len=min_len, max_len=max_len, transcript=transcript, language=note, hook=HOOK_RULE)
 
 
 CATEGORIES = {"funny", "fail", "clutch", "rage", "shock", "take", "story", "other"}
@@ -106,11 +126,10 @@ This stream is {game}. Pick the moments that only mean something with that game 
 - Then: a chase, a crash, a stunt, a glitch, a discovery, a jump scare, something an animal or a passer-by
   in the game did, or the streamer reacting to one of those. A fight or a death counts too, but only when
   the surprising or funny part is something other than the fighting.
-- The hook promises what is about to happen, in two to five words, and names something a viewer can picture:
-  a number, a thing, or the turn it takes ("COPS IN 2 SECONDS", "1 VS 3", "HE FOUND BIGFOOT", "THE SHOT").
+- The hook says the problem this game's player would recognise, in two to five words, and never how it ends.
   Words that were really said are a hook only when those words are themselves the moment ("IT'S BIGFOOT!");
   a line of ordinary talk is not a hook, however loud it was. Never the name of a mood or a kind of clip
-  ("CHAOS", "ROAD RAGE", "GOES WRONG", "EPIC FAIL"), and never a sentence that needs the game explained.
+  ("CHAOS", "ROAD RAGE", "GOES WRONG", "EPIC FAIL"), and never a hook that needs the game explained.
 - The title names the game when the clip is about it.
 - The hashtags include {tags}.
 """
