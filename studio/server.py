@@ -1631,7 +1631,11 @@ def add_posts(body: dict = Body(...)):
     made = posting.enqueue(job, clip, [str(a) for a in body.get("accounts", [])][:20], now=bool(body.get("now")))
     if not made:
         raise HTTPException(400, "Nothing was queued. Pick at least one account this clip has not already gone to.")
-    return {"queued": len(made)}
+    # Asked to go now, but an account that has used up its posts for today waits for its next free slot
+    # instead. The page says so, because "Posting now" would otherwise be untrue.
+    waiting = [p for p in made if body.get("now") and p["due_at"] > time.time() + 60]
+    return {"queued": len(made), "waiting": len(waiting),
+            "next_at": min((p["due_at"] for p in waiting), default=None)}
 
 
 @app.post("/api/posts/{pid}/{action}")

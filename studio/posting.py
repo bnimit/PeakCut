@@ -97,6 +97,25 @@ def _at_hour(t, hour, tomorrow=False):
     return d.replace(hour=hour, minute=0, second=0, microsecond=0).timestamp()
 
 
+def _on_day(account_id, when) -> int:
+    """How many posts this account already has on the day `when` falls in: waiting, due, or already up."""
+    return sum(1 for p in _mine()
+               if p["account"] == account_id and p["status"] in OPEN + ("posted",)
+               and _slot_day(p.get("posted_at") or p["due_at"]) == _slot_day(when))
+
+
+def room_today(account_id, creator=None) -> int:
+    """How many more posts can still go to this account today. Zero means the day is full.
+
+    YouTube keeps its own limit on how many videos an account may put up in a day, and it does not tell
+    us what the limit is or how close we are: all that comes back is "the user has exceeded the number of
+    videos they may upload", and only after the whole video has been sent. Staying inside the creator's
+    own daily cap is what keeps us well under theirs, so the cap has to hold for every way of posting.
+    """
+    cap = (creators.get(creator) or creators.DEFAULTS)["daily_cap"] if creator else creators.DEFAULTS["daily_cap"]
+    return max(0, cap - _on_day(account_id, time.time()))
+
+
 def _next_slot(account_id, gap_min, cap):
     """Earliest time that respects the gap between posts, the daily cap, and the hours people are awake.
 
@@ -133,7 +152,12 @@ def enqueue(job, clip, account_ids, now=False) -> list:
             if any(p["job"] == job["id"] and p["clip"] == clip["id"] and p["account"] == aid
                    and p["status"] in OPEN + ("posted",) for p in _mine()):
                 continue  # never post the same clip to the same account twice
-            due = time.time() if now else _next_slot(aid, c["post_gap_min"], c["daily_cap"])
+            # "Post now" skips the wait, never the day's cap. A run of them once put twelve videos up in a
+            # day, eight of them inside one hour: YouTube refused seven outright for going over its own
+            # daily limit and left three more sitting in processing for a day, watchable by nobody. With
+            # the day already full it waits for the next free slot, the same as any other post.
+            send_now = now and room_today(aid, job["creator"])
+            due = time.time() if send_now else _next_slot(aid, c["post_gap_min"], c["daily_cap"])
             p = {"id": secrets.token_hex(8), "user": ctx.uid(), "job": job["id"], "clip": clip["id"], "creator": job["creator"],
                  "account": aid, "account_name": acc["name"], "platform": acc["platform"], "status": "scheduled",
                  "due_at": due, "created": time.time(), "title": clip.get("title") or clip.get("hook") or "Clip",

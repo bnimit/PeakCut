@@ -2592,8 +2592,13 @@ document.addEventListener("click", async e => {
       if (!accs.length) return toast("Tick at least one account first.", "bad");
       if (a === "postnow" && !await ask("Post now?", `This clip goes to ${accs.length} account${accs.length > 1 ? "s" : ""} straight away.`, "Post now")) return;
       await send(`/api/jobs/${D.jid}/clips/${D.cid}/text`, postText(), "PUT");   // the text as it is in the boxes now
-      await send("/api/posts", {job:D.jid, clip:D.cid, accounts:accs, now:a === "postnow"});
-      toast(a === "postnow" ? "Posting now" : "Added to the queue", "ok"); return tick();
+      const r = await send("/api/posts", {job:D.jid, clip:D.cid, accounts:accs, now:a === "postnow"});
+      // An account that has had its posts for today waits for its next slot, so saying "Posting now" would be untrue.
+      if (a === "postnow" && r?.waiting)
+        toast(`That account has had its posts for today, so this one waits until ${new Date(r.next_at * 1000)
+              .toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"})}.`, "ok");
+      else toast(a === "postnow" ? "Posting now" : "Added to the queue", "ok");
+      return tick();
     }
   } catch (err) { b.disabled = false; toast(err.message, "bad"); }
 });

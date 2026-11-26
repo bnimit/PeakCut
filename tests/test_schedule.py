@@ -145,5 +145,66 @@ else:
            if posting._slot_day(t) != posting._slot_day(out[0])} >= {"09:00"}, True)
     posting.ZONE = None
 
+
+# ---- "post now" skips the wait, not the day's cap
+# A run of "post now" once put twelve videos up in a day, eight of them inside one hour. YouTube refused
+# seven of them outright for going over its own daily limit ("the user has exceeded the number of videos
+# they may upload") and left three more sitting in processing for a day, watchable by nobody. The cap is
+# what keeps us well under YouTube's, so it has to hold for every way of posting, "now" included.
+from studio import accounts as _accounts, creators as _creators, ctx as _ctx  # noqa: E402
+
+posting.ZONE = None
+CAP, GAP = 6, 150
+full_day = [at(h) for h in ("09:00", "11:30", "14:00", "16:30", "19:00", "21:30")]
+
+
+def books(times, now):
+    posting._posts[:] = [{"id": "p%d" % i, "user": "u_local", "account": ACC, "status": "posted",
+                          "job": "old", "clip": "c%d" % i, "due_at": t, "posted_at": t}
+                         for i, t in enumerate(times)]
+    posting._mine = lambda: list(posting._posts)
+    posting.time.time = lambda: now
+
+
+books([], at("10:00"))
+check("an empty day has all its posts left", posting.room_today(ACC, None), CAP)
+books(full_day[:4], at("17:00"))
+check("a part-used day has the rest left", posting.room_today(ACC, None), 2)
+books(full_day, at("21:45"))
+check("a full day has none left", posting.room_today(ACC, None), 0)
+books(full_day, at("21:45"))
+check("another account's day is its own", posting.room_today("yt_other", None), CAP)
+# Yesterday's posts are yesterday's: a full day must not hold tomorrow up.
+books([at(h, "2026-11-21") for h in ("09:00", "11:30", "14:00", "16:30", "19:00", "21:30")], at("10:00"))
+check("yesterday's posts do not count against today", posting.room_today(ACC, None), CAP)
+
+
+def post_now(times, now):
+    """Ask to post one clip right now, with these already on the books, and say when it would really go."""
+    books(times, now)
+    _creators.get = lambda _i: dict(_creators.DEFAULTS, accounts=[ACC], post_gap_min=GAP, daily_cap=CAP)
+    _accounts.get = lambda aid: {"name": "Gaming Clips", "platform": "youtube", "id": aid}
+    _ctx.uid = lambda: "u_local"
+    posting._save = lambda: None
+    posting._mirror = lambda _p: None
+    made = posting.enqueue({"id": "j1", "creator": "c1"}, {"id": "clip01", "title": "T"}, [ACC], now=True)
+    return made[0]["due_at"]
+
+
+check("post now on a day with room goes straight out", when(post_now(full_day[:3], at("17:00"))), DAY + " 17:00")
+check("post now on a full day waits for the next morning instead",
+      when(post_now(full_day, at("21:45"))), "2026-11-23 09:00")
+check("post now on a full day is still queued, not thrown away",
+      post_now(full_day, at("21:45")) > 0, True)
+# The whole point: however many times it is asked, the day cannot go over its cap. Each one is left on the
+# books, the way a real run of them would be, so every new ask sees the ones before it.
+books([], at("09:00"))
+asked = [posting.enqueue({"id": "j1", "creator": "c1"}, {"id": "clip%02d" % i, "title": "T"}, [ACC], now=True)[0]["due_at"]
+         for i in range(10)]
+check("ten 'post now' in a row still put only the cap on the first day",
+      sum(1 for t in asked if posting._slot_day(t) == posting._slot_day(asked[0])), CAP)
+check("the rest of them are spread over later days", len({posting._slot_day(t) for t in asked}) > 1, True)
+check("none of the ten is lost", len(asked), 10)
+
 print("ALL PASSED" if not fails else f"{len(fails)} FAILED")
 sys.exit(1 if fails else 0)
